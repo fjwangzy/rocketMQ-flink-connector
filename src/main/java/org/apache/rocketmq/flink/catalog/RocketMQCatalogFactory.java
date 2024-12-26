@@ -35,34 +35,31 @@ import static org.apache.rocketmq.flink.catalog.RocketMQCatalogFactoryOptions.SC
 /** The {@CatalogFactory} implementation of RocketMQ. */
 public class RocketMQCatalogFactory implements CatalogFactory {
 
-    @Override
-    public Catalog createCatalog(Context context) {
-        final FactoryUtil.CatalogFactoryHelper helper =
-                FactoryUtil.createCatalogFactoryHelper(this, context);
-        helper.validate();
-        return new RocketMQCatalog(
-                context.getName(),
-                helper.getOptions().get(DEFAULT_DATABASE),
-                helper.getOptions().get(NAME_SERVER_ADDR),
-                helper.getOptions().get(SCHEMA_REGISTRY_BASE_URL));
-    }
+	@Override
+	public Catalog createCatalog(Context context) {
+		final FactoryUtil.CatalogFactoryHelper helper = FactoryUtil.createCatalogFactoryHelper(this, context);
+		helper.validate();
+		return new RocketMQCatalog(context.getName(), helper.getOptions().get(DEFAULT_DATABASE),
+				helper.getOptions().get(NAME_SERVER_ADDR), helper.getOptions().get(SCHEMA_REGISTRY_BASE_URL));
+	}
 
-    @Override
-    public String factoryIdentifier() {
-        return IDENTIFIER;
-    }
+	@Override
+	public String factoryIdentifier() {
+		return IDENTIFIER;
+	}
 
-    @Override
-    public Set<ConfigOption<?>> requiredOptions() {
-        return Collections.emptySet();
-    }
+	@Override
+	public Set<ConfigOption<?>> requiredOptions() {
+		return Collections.emptySet();
+	}
 
-    @Override
-    public Set<ConfigOption<?>> optionalOptions() {
-        Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(DEFAULT_DATABASE);
-        options.add(NAME_SERVER_ADDR);
-        options.add(SCHEMA_REGISTRY_BASE_URL);
-        return options;
-    }
+	@Override
+	public Set<ConfigOption<?>> optionalOptions() {
+		Set<ConfigOption<?>> options = new HashSet<>();
+		options.add(DEFAULT_DATABASE);
+		options.add(NAME_SERVER_ADDR);
+		options.add(SCHEMA_REGISTRY_BASE_URL);
+		return options;
+	}
+
 }

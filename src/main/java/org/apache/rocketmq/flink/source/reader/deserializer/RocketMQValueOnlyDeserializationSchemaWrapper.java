@@ -28,28 +28,30 @@ import java.io.IOException;
 import java.util.List;
 
 /** DeserializeWrapper to wrap DeserializationSchema */
-public class RocketMQValueOnlyDeserializationSchemaWrapper<T>
-        implements RocketMQDeserializationSchema<T> {
-    private static final long serialVersionUID = 1L;
-    private final DeserializationSchema<List<MessageExt>, T> deserializationSchema;
+public class RocketMQValueOnlyDeserializationSchemaWrapper<T> implements RocketMQDeserializationSchema<T> {
 
-    public RocketMQValueOnlyDeserializationSchemaWrapper(
-            DeserializationSchema<List<MessageExt>, T> deserializationSchema) {
-        this.deserializationSchema = deserializationSchema;
-    }
+	private static final long serialVersionUID = 1L;
 
-    @Override
-    public void open(InitializationContext context) throws Exception {
-        deserializationSchema.open(context);
-    }
+	private final DeserializationSchema<List<MessageExt>, T> deserializationSchema;
 
-    @Override
-    public void deserialize(List<MessageExt> record, Collector<T> out) throws IOException {
-        deserializationSchema.deserialize(record, out);
-    }
+	public RocketMQValueOnlyDeserializationSchemaWrapper(
+			DeserializationSchema<List<MessageExt>, T> deserializationSchema) {
+		this.deserializationSchema = deserializationSchema;
+	}
 
-    @Override
-    public TypeInformation<T> getProducedType() {
-        return deserializationSchema.getProducedType();
-    }
+	@Override
+	public void open(InitializationContext context) throws Exception {
+		deserializationSchema.open(context);
+	}
+
+	@Override
+	public void deserialize(List<MessageExt> record, Collector<T> out) throws IOException {
+		deserializationSchema.deserialize(record, out);
+	}
+
+	@Override
+	public TypeInformation<T> getProducedType() {
+		return deserializationSchema.getProducedType();
+	}
+
 }

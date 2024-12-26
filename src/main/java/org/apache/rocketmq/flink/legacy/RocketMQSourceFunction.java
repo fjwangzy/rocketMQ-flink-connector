@@ -83,577 +83,512 @@ import static org.apache.rocketmq.flink.legacy.RocketMQConfig.DEFAULT_CONSUMER_B
 import static org.apache.rocketmq.flink.legacy.common.util.RocketMQUtils.getInteger;
 
 /**
- * The RocketMQSource is based on RocketMQ pull consumer mode, and provides exactly once reliability
- * guarantees when checkpoints are enabled. Otherwise, the source doesn't provide any reliability
- * guarantees.
+ * The RocketMQSource is based on RocketMQ pull consumer mode, and provides exactly once
+ * reliability guarantees when checkpoints are enabled. Otherwise, the source doesn't
+ * provide any reliability guarantees.
  */
 public class RocketMQSourceFunction<OUT> extends RichParallelSourceFunction<OUT>
-        implements CheckpointedFunction, CheckpointListener, ResultTypeQueryable<OUT> {
+		implements CheckpointedFunction, CheckpointListener, ResultTypeQueryable<OUT> {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private static final Logger log = LoggerFactory.getLogger(RocketMQSourceFunction.class);
-    private static final String OFFSETS_STATE_NAME = "topic-partition-offset-states";
-    private RunningChecker runningChecker;
-    private transient DefaultMQPullConsumer consumer;
-    private KeyValueDeserializationSchema<OUT> schema;
-    private transient ListState<Tuple2<MessageQueue, Long>> unionOffsetStates;
-    private Map<MessageQueue, Long> offsetTable = new ConcurrentHashMap<>();
-    private Map<MessageQueue, Long> restoredOffsets;
-    private List<MessageQueue> messageQueues;
-    private ExecutorService executor;
+	private static final Logger log = LoggerFactory.getLogger(RocketMQSourceFunction.class);
 
-    // watermark in source
-    private WaterMarkPerQueue waterMarkPerQueue;
-    private WaterMarkForAll waterMarkForAll;
+	private static final String OFFSETS_STATE_NAME = "topic-partition-offset-states";
 
-    private ScheduledExecutorService timer;
-    /** Data for pending but uncommitted offsets. */
-    private LinkedMap pendingOffsetsToCommit;
+	private RunningChecker runningChecker;
 
-    private Properties props;
-    private String topic;
-    private String group;
-    private transient volatile boolean restored;
-    private transient boolean enableCheckpoint;
-    private volatile Object checkPointLock;
+	private transient DefaultMQPullConsumer consumer;
 
-    private Meter tpsMetric;
-    private MetricUtils.TimestampGauge fetchDelay = new MetricUtils.TimestampGauge();
-    private MetricUtils.TimestampGauge emitDelay = new MetricUtils.TimestampGauge();
+	private KeyValueDeserializationSchema<OUT> schema;
 
-    /** The startup mode for the consumer (default is {@link StartupMode#GROUP_OFFSETS}). */
-    private StartupMode startMode = StartupMode.GROUP_OFFSETS;
+	private transient ListState<Tuple2<MessageQueue, Long>> unionOffsetStates;
 
-    /**
-     * If StartupMode#GROUP_OFFSETS has no commit offset.OffsetResetStrategy would offer init
-     * strategy.
-     */
-    private OffsetResetStrategy offsetResetStrategy = OffsetResetStrategy.LATEST;
+	private Map<MessageQueue, Long> offsetTable = new ConcurrentHashMap<>();
 
-    /**
-     * Specific startup offsets; only relevant when startup mode is {@link
-     * StartupMode#SPECIFIC_OFFSETS}.
-     */
-    private Map<MessageQueue, Long> specificStartupOffsets;
+	private Map<MessageQueue, Long> restoredOffsets;
 
-    /**
-     * Specific startup offsets; only relevant when startup mode is {@link StartupMode#TIMESTAMP}.
-     */
-    private long specificTimeStamp;
+	private List<MessageQueue> messageQueues;
 
-    public RocketMQSourceFunction(KeyValueDeserializationSchema<OUT> schema, Properties props) {
-        this.schema = schema;
-        this.props = props;
-    }
+	private ExecutorService executor;
 
-    @Override
-    public void open(Configuration parameters) throws Exception {
-        log.debug("source open....");
-        Validate.notEmpty(props, "Consumer properties can not be empty");
+	// watermark in source
+	private WaterMarkPerQueue waterMarkPerQueue;
 
-        this.topic = props.getProperty(RocketMQConfig.CONSUMER_TOPIC);
-        this.group = props.getProperty(RocketMQConfig.CONSUMER_GROUP);
+	private WaterMarkForAll waterMarkForAll;
 
-        Validate.notEmpty(topic, "Consumer topic can not be empty");
-        Validate.notEmpty(group, "Consumer group can not be empty");
+	private ScheduledExecutorService timer;
 
-        String tag = props.getProperty(RocketMQConfig.CONSUMER_TAG);
-        String sql = props.getProperty(RocketMQConfig.CONSUMER_SQL);
-        Validate.isTrue(
-                !(StringUtils.isNotEmpty(tag) && StringUtils.isNotEmpty(sql)),
-                "Consumer tag and sql can not set value at the same time");
+	/** Data for pending but uncommitted offsets. */
+	private LinkedMap pendingOffsetsToCommit;
 
-        this.enableCheckpoint =
-                ((StreamingRuntimeContext) getRuntimeContext()).isCheckpointingEnabled();
+	private Properties props;
 
-        if (restoredOffsets == null) {
-            restoredOffsets = new ConcurrentHashMap<>();
-        }
+	private String topic;
 
-        if (pendingOffsetsToCommit == null) {
-            pendingOffsetsToCommit = new LinkedMap();
-        }
-        if (checkPointLock == null) {
-            checkPointLock = new ReentrantLock();
-        }
-        if (waterMarkPerQueue == null) {
-            waterMarkPerQueue = new WaterMarkPerQueue(5000);
-        }
-        if (waterMarkForAll == null) {
-            waterMarkForAll = new WaterMarkForAll(5000);
-        }
-        if (timer == null) {
-            timer = Executors.newSingleThreadScheduledExecutor();
-        }
+	private String group;
 
-        runningChecker = new RunningChecker();
-        runningChecker.setState(RunningChecker.State.RUNNING);
+	private transient volatile boolean restored;
 
-        final ThreadFactory threadFactory =
-                new ThreadFactoryBuilder()
-                        .setDaemon(true)
-                        .setNameFormat("rmq-pull-thread-%d")
-                        .build();
-        executor = Executors.newCachedThreadPool(threadFactory);
+	private transient boolean enableCheckpoint;
 
-        int indexOfThisSubTask = getRuntimeContext().getIndexOfThisSubtask();
-        consumer = new DefaultMQPullConsumer(group, RocketMQConfig.buildAclRPCHook(props));
-        RocketMQConfig.buildConsumerConfigs(props, consumer);
+	private volatile Object checkPointLock;
 
-        // set unique instance name, avoid exception:
-        // https://help.aliyun.com/document_detail/29646.html
-        String runtimeName = ManagementFactory.getRuntimeMXBean().getName();
-        String instanceName =
-                RocketMQUtils.getInstanceName(
-                        runtimeName,
-                        topic,
-                        group,
-                        String.valueOf(indexOfThisSubTask),
-                        String.valueOf(System.nanoTime()));
-        consumer.setInstanceName(instanceName);
-        consumer.start();
+	private Meter tpsMetric;
 
-        Counter outputCounter =
-                getRuntimeContext()
-                        .getMetricGroup()
-                        .counter(MetricUtils.METRICS_TPS + "_counter", new SimpleCounter());
-        tpsMetric =
-                getRuntimeContext()
-                        .getMetricGroup()
-                        .meter(MetricUtils.METRICS_TPS, new MeterView(outputCounter, 60));
+	private MetricUtils.TimestampGauge fetchDelay = new MetricUtils.TimestampGauge();
 
-        getRuntimeContext()
-                .getMetricGroup()
-                .gauge(MetricUtils.CURRENT_FETCH_EVENT_TIME_LAG, fetchDelay);
-        getRuntimeContext()
-                .getMetricGroup()
-                .gauge(MetricUtils.CURRENT_EMIT_EVENT_TIME_LAG, emitDelay);
+	private MetricUtils.TimestampGauge emitDelay = new MetricUtils.TimestampGauge();
 
-        final RuntimeContext ctx = getRuntimeContext();
-        // The lock that guarantees that record emission and state updates are atomic,
-        // from the view of taking a checkpoint.
-        int taskNumber = ctx.getNumberOfParallelSubtasks();
-        int taskIndex = ctx.getIndexOfThisSubtask();
-        log.info("Source run, NumberOfTotalTask={}, IndexOfThisSubTask={}", taskNumber, taskIndex);
-        Collection<MessageQueue> totalQueues = consumer.fetchSubscribeMessageQueues(topic);
-        messageQueues =
-                RocketMQUtils.allocate(totalQueues, taskNumber, ctx.getIndexOfThisSubtask());
-        // If the job recovers from the state, the state has already contained the offsets of last
-        // commit.
-        if (restored) {
-            initOffsetTableFromRestoredOffsets(messageQueues);
-        } else {
-            this.offsetTable =
-                    RocketMQUtils.initOffsets(
-                            messageQueues,
-                            consumer,
-                            startMode,
-                            offsetResetStrategy,
-                            specificTimeStamp,
-                            specificStartupOffsets);
-        }
-    }
+	/**
+	 * The startup mode for the consumer (default is {@link StartupMode#GROUP_OFFSETS}).
+	 */
+	private StartupMode startMode = StartupMode.GROUP_OFFSETS;
 
-    @Override
-    public void run(SourceContext context) throws Exception {
-        String sql = props.getProperty(RocketMQConfig.CONSUMER_SQL);
-        String tag =
-                props.getProperty(RocketMQConfig.CONSUMER_TAG, RocketMQConfig.DEFAULT_CONSUMER_TAG);
-        int pullBatchSize = getInteger(props, CONSUMER_BATCH_SIZE, DEFAULT_CONSUMER_BATCH_SIZE);
-        timer.scheduleAtFixedRate(
-                () -> {
-                    // context.emitWatermark(waterMarkPerQueue.getCurrentWatermark());
-                    context.emitWatermark(waterMarkForAll.getCurrentWatermark());
-                },
-                5,
-                5,
-                TimeUnit.SECONDS);
-        for (MessageQueue mq : messageQueues) {
-            this.executor.execute(
-                    () ->
-                            RetryUtil.call(
-                                    () -> {
-                                        while (runningChecker.isRunning()) {
-                                            try {
-                                                long offset = offsetTable.get(mq);
-                                                PullResult pullResult;
-                                                if (StringUtils.isEmpty(sql)) {
-                                                    pullResult =
-                                                            consumer.pullBlockIfNotFound(
-                                                                    mq, tag, offset, pullBatchSize);
-                                                } else {
-                                                    // pull with sql do not support block pull.
-                                                    pullResult =
-                                                            consumer.pull(
-                                                                    mq,
-                                                                    MessageSelector.bySql(sql),
-                                                                    offset,
-                                                                    pullBatchSize);
-                                                }
+	/**
+	 * If StartupMode#GROUP_OFFSETS has no commit offset.OffsetResetStrategy would offer
+	 * init strategy.
+	 */
+	private OffsetResetStrategy offsetResetStrategy = OffsetResetStrategy.LATEST;
 
-                                                boolean found = false;
-                                                switch (pullResult.getPullStatus()) {
-                                                    case FOUND:
-                                                        List<MessageExt> messages =
-                                                                pullResult.getMsgFoundList();
-                                                        long fetchTime = System.currentTimeMillis();
-                                                        for (MessageExt msg : messages) {
-                                                            byte[] key =
-                                                                    msg.getKeys() != null
-                                                                            ? msg.getKeys()
-                                                                                    .getBytes(
-                                                                                            StandardCharsets
-                                                                                                    .UTF_8)
-                                                                            : null;
-                                                            byte[] value = msg.getBody();
-                                                            OUT data =
-                                                                    schema.deserializeKeyAndValue(
-                                                                            key, value);
+	/**
+	 * Specific startup offsets; only relevant when startup mode is
+	 * {@link StartupMode#SPECIFIC_OFFSETS}.
+	 */
+	private Map<MessageQueue, Long> specificStartupOffsets;
 
-                                                            // output and state update are atomic
-                                                            synchronized (checkPointLock) {
-                                                                log.debug(
-                                                                        msg.getMsgId()
-                                                                                + "_"
-                                                                                + msg
-                                                                                        .getBrokerName()
-                                                                                + " "
-                                                                                + msg.getQueueId()
-                                                                                + " "
-                                                                                + msg
-                                                                                        .getQueueOffset());
-                                                                context.collectWithTimestamp(
-                                                                        data,
-                                                                        msg.getBornTimestamp());
-                                                                long emitTime =
-                                                                        System.currentTimeMillis();
+	/**
+	 * Specific startup offsets; only relevant when startup mode is
+	 * {@link StartupMode#TIMESTAMP}.
+	 */
+	private long specificTimeStamp;
 
-                                                                // update max eventTime per queue
-                                                                // waterMarkPerQueue.extractTimestamp(mq, msg.getBornTimestamp());
-                                                                waterMarkForAll.extractTimestamp(
-                                                                        msg.getBornTimestamp());
-                                                                tpsMetric.markEvent();
-                                                                long eventTime =
-                                                                        msg.getStoreTimestamp();
-                                                                fetchDelay.report(
-                                                                        Math.abs(
-                                                                                fetchTime
-                                                                                        - eventTime));
-                                                                emitDelay.report(
-                                                                        Math.abs(
-                                                                                emitTime
-                                                                                        - eventTime));
-                                                            }
-                                                        }
-                                                        found = true;
-                                                        break;
-                                                    case NO_MATCHED_MSG:
-                                                        log.debug(
-                                                                "No matched message after offset {} for queue {}",
-                                                                offset,
-                                                                mq);
-                                                        break;
-                                                    case NO_NEW_MSG:
-                                                        log.debug(
-                                                                "No new message after offset {} for queue {}",
-                                                                offset,
-                                                                mq);
-                                                        break;
-                                                    case OFFSET_ILLEGAL:
-                                                        log.warn(
-                                                                "Offset {} is illegal for queue {}",
-                                                                offset,
-                                                                mq);
-                                                        break;
-                                                    default:
-                                                        break;
-                                                }
+	public RocketMQSourceFunction(KeyValueDeserializationSchema<OUT> schema, Properties props) {
+		this.schema = schema;
+		this.props = props;
+	}
 
-                                                synchronized (checkPointLock) {
-                                                    updateMessageQueueOffset(
-                                                            mq, pullResult.getNextBeginOffset());
-                                                }
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		log.debug("source open....");
+		Validate.notEmpty(props, "Consumer properties can not be empty");
 
-                                                if (!found) {
-                                                    RetryUtil.waitForMs(
-                                                            RocketMQConfig
-                                                                    .DEFAULT_CONSUMER_DELAY_WHEN_MESSAGE_NOT_FOUND);
-                                                }
-                                            } catch (Exception e) {
-                                                throw new RuntimeException(e);
-                                            }
-                                        }
-                                        return true;
-                                    },
-                                    "RuntimeException",
-                                    runningChecker));
-        }
+		this.topic = props.getProperty(RocketMQConfig.CONSUMER_TOPIC);
+		this.group = props.getProperty(RocketMQConfig.CONSUMER_GROUP);
 
-        awaitTermination();
-        // The exception in thread pools should be thrown in main thread.Then the job would switch
-        // from state RUNNING to FAILED.
-        if (runningChecker.isFailed()) {
-            throw new RuntimeException(
-                    "RunningChecker is failed, Please check the log in consumer thread");
-        }
-    }
+		Validate.notEmpty(topic, "Consumer topic can not be empty");
+		Validate.notEmpty(group, "Consumer group can not be empty");
 
-    private void awaitTermination() throws InterruptedException {
-        while (runningChecker.isRunning()) {
-            Thread.sleep(50);
-        }
-    }
+		String tag = props.getProperty(RocketMQConfig.CONSUMER_TAG);
+		String sql = props.getProperty(RocketMQConfig.CONSUMER_SQL);
+		Validate.isTrue(!(StringUtils.isNotEmpty(tag) && StringUtils.isNotEmpty(sql)),
+				"Consumer tag and sql can not set value at the same time");
 
-    /** consume from the min offset at every restart with no state */
-    public RocketMQSourceFunction<OUT> setStartFromEarliest() {
-        this.startMode = StartupMode.EARLIEST;
-        return this;
-    }
+		this.enableCheckpoint = ((StreamingRuntimeContext) getRuntimeContext()).isCheckpointingEnabled();
 
-    /** consume from the max offset of each broker's queue at every restart with no state */
-    public RocketMQSourceFunction<OUT> setStartFromLatest() {
-        this.startMode = StartupMode.LATEST;
-        return this;
-    }
+		if (restoredOffsets == null) {
+			restoredOffsets = new ConcurrentHashMap<>();
+		}
 
-    /** consume from the closest offset */
-    public RocketMQSourceFunction<OUT> setStartFromTimeStamp(long timeStamp) {
-        this.startMode = StartupMode.TIMESTAMP;
-        this.specificTimeStamp = timeStamp;
-        return this;
-    }
+		if (pendingOffsetsToCommit == null) {
+			pendingOffsetsToCommit = new LinkedMap();
+		}
+		if (checkPointLock == null) {
+			checkPointLock = new ReentrantLock();
+		}
+		if (waterMarkPerQueue == null) {
+			waterMarkPerQueue = new WaterMarkPerQueue(5000);
+		}
+		if (waterMarkForAll == null) {
+			waterMarkForAll = new WaterMarkForAll(5000);
+		}
+		if (timer == null) {
+			timer = Executors.newSingleThreadScheduledExecutor();
+		}
 
-    /** consume from the group offsets those was stored in brokers. */
-    public RocketMQSourceFunction<OUT> setStartFromGroupOffsets() {
-        this.startMode = StartupMode.GROUP_OFFSETS;
-        return this;
-    }
+		runningChecker = new RunningChecker();
+		runningChecker.setState(RunningChecker.State.RUNNING);
 
-    /**
-     * consume from the group offsets those was stored in brokers. If there is no committed
-     * offset,#{@link OffsetResetStrategy} would provide initialization policy.
-     */
-    public RocketMQSourceFunction<OUT> setStartFromGroupOffsets(
-            OffsetResetStrategy offsetResetStrategy) {
-        this.startMode = StartupMode.GROUP_OFFSETS;
-        this.offsetResetStrategy = offsetResetStrategy;
-        return this;
-    }
+		final ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
+			.setNameFormat("rmq-pull-thread-%d")
+			.build();
+		executor = Executors.newCachedThreadPool(threadFactory);
 
-    /**
-     * consume from the specific offset. Group offsets is enable while the broker didn't specify
-     * offset.
-     */
-    public RocketMQSourceFunction<OUT> setStartFromSpecificOffsets(
-            Map<MessageQueue, Long> specificOffsets) {
-        this.specificStartupOffsets = specificOffsets;
-        this.startMode = StartupMode.SPECIFIC_OFFSETS;
-        return this;
-    }
+		int indexOfThisSubTask = getRuntimeContext().getIndexOfThisSubtask();
+		consumer = new DefaultMQPullConsumer(group, RocketMQConfig.buildAclRPCHook(props));
+		RocketMQConfig.buildConsumerConfigs(props, consumer);
 
-    private void updateMessageQueueOffset(MessageQueue mq, long offset) throws MQClientException {
-        offsetTable.put(mq, offset);
-        if (!enableCheckpoint) {
-            consumer.updateConsumeOffset(mq, offset);
-            consumer.getOffsetStore().persist(consumer.queueWithNamespace(mq));
-        }
-    }
+		// set unique instance name, avoid exception:
+		// https://help.aliyun.com/document_detail/29646.html
+		String runtimeName = ManagementFactory.getRuntimeMXBean().getName();
+		String instanceName = RocketMQUtils.getInstanceName(runtimeName, topic, group,
+				String.valueOf(indexOfThisSubTask), String.valueOf(System.nanoTime()));
+		consumer.setInstanceName(instanceName);
+		consumer.start();
 
-    @Override
-    public void cancel() {
-        log.debug("cancel ...");
-        runningChecker.setState(RunningChecker.State.FINISHED);
+		Counter outputCounter = getRuntimeContext().getMetricGroup()
+			.counter(MetricUtils.METRICS_TPS + "_counter", new SimpleCounter());
+		tpsMetric = getRuntimeContext().getMetricGroup()
+			.meter(MetricUtils.METRICS_TPS, new MeterView(outputCounter, 60));
 
-        if (timer != null) {
-            timer.shutdown();
-            timer = null;
-        }
+		getRuntimeContext().getMetricGroup().gauge(MetricUtils.CURRENT_FETCH_EVENT_TIME_LAG, fetchDelay);
+		getRuntimeContext().getMetricGroup().gauge(MetricUtils.CURRENT_EMIT_EVENT_TIME_LAG, emitDelay);
 
-        if (executor != null) {
-            executor.shutdown();
-            executor = null;
-        }
+		final RuntimeContext ctx = getRuntimeContext();
+		// The lock that guarantees that record emission and state updates are atomic,
+		// from the view of taking a checkpoint.
+		int taskNumber = ctx.getNumberOfParallelSubtasks();
+		int taskIndex = ctx.getIndexOfThisSubtask();
+		log.info("Source run, NumberOfTotalTask={}, IndexOfThisSubTask={}", taskNumber, taskIndex);
+		Collection<MessageQueue> totalQueues = consumer.fetchSubscribeMessageQueues(topic);
+		messageQueues = RocketMQUtils.allocate(totalQueues, taskNumber, ctx.getIndexOfThisSubtask());
+		// If the job recovers from the state, the state has already contained the offsets
+		// of last
+		// commit.
+		if (restored) {
+			initOffsetTableFromRestoredOffsets(messageQueues);
+		}
+		else {
+			this.offsetTable = RocketMQUtils.initOffsets(messageQueues, consumer, startMode, offsetResetStrategy,
+					specificTimeStamp, specificStartupOffsets);
+		}
+	}
 
-        if (consumer != null) {
-            consumer.shutdown();
-            consumer = null;
-        }
+	@Override
+	public void run(SourceContext context) throws Exception {
+		String sql = props.getProperty(RocketMQConfig.CONSUMER_SQL);
+		String tag = props.getProperty(RocketMQConfig.CONSUMER_TAG, RocketMQConfig.DEFAULT_CONSUMER_TAG);
+		int pullBatchSize = getInteger(props, CONSUMER_BATCH_SIZE, DEFAULT_CONSUMER_BATCH_SIZE);
+		timer.scheduleAtFixedRate(() -> {
+			// context.emitWatermark(waterMarkPerQueue.getCurrentWatermark());
+			context.emitWatermark(waterMarkForAll.getCurrentWatermark());
+		}, 5, 5, TimeUnit.SECONDS);
+		for (MessageQueue mq : messageQueues) {
+			this.executor.execute(() -> RetryUtil.call(() -> {
+				while (runningChecker.isRunning()) {
+					try {
+						long offset = offsetTable.get(mq);
+						PullResult pullResult;
+						if (StringUtils.isEmpty(sql)) {
+							pullResult = consumer.pullBlockIfNotFound(mq, tag, offset, pullBatchSize);
+						}
+						else {
+							// pull with sql do not support block pull.
+							pullResult = consumer.pull(mq, MessageSelector.bySql(sql), offset, pullBatchSize);
+						}
 
-        if (offsetTable != null) {
-            offsetTable.clear();
-            offsetTable = null;
-        }
-        if (restoredOffsets != null) {
-            restoredOffsets.clear();
-            restoredOffsets = null;
-        }
-        if (pendingOffsetsToCommit != null) {
-            pendingOffsetsToCommit.clear();
-            pendingOffsetsToCommit = null;
-        }
-    }
+						boolean found = false;
+						switch (pullResult.getPullStatus()) {
+							case FOUND:
+								List<MessageExt> messages = pullResult.getMsgFoundList();
+								long fetchTime = System.currentTimeMillis();
+								for (MessageExt msg : messages) {
+									byte[] key = msg.getKeys() != null ? msg.getKeys().getBytes(StandardCharsets.UTF_8)
+											: null;
+									byte[] value = msg.getBody();
+									OUT data = schema.deserializeKeyAndValue(key, value);
 
-    @Override
-    public void close() throws Exception {
-        log.debug("close ...");
-        // pretty much the same logic as cancelling
-        try {
-            cancel();
-        } finally {
-            super.close();
-        }
-    }
+									// output and state update are atomic
+									synchronized (checkPointLock) {
+										log.debug(msg.getMsgId() + "_" + msg.getBrokerName() + " " + msg.getQueueId()
+												+ " " + msg.getQueueOffset());
+										context.collectWithTimestamp(data, msg.getBornTimestamp());
+										long emitTime = System.currentTimeMillis();
 
-    public void initOffsetTableFromRestoredOffsets(List<MessageQueue> messageQueues)
-            throws MQClientException {
-        Preconditions.checkNotNull(restoredOffsets, "restoredOffsets can't be null");
-        restoredOffsets.forEach(
-                (mq, offset) -> {
-                    if (messageQueues.contains(mq)) {
-                        offsetTable.put(mq, offset);
-                    }
-                });
-        // Discovery topic Route change when recover.When a new messageQueue joins.A Legal offset or
-        // the earliest offset will be used.
-        if (!offsetTable.keySet().containsAll(messageQueues)) {
-            List<MessageQueue> newMessageQueues =
-                    messageQueues.stream()
-                            .filter(mq -> !offsetTable.containsKey(mq))
-                            .collect(Collectors.toList());
-            for (MessageQueue mq : newMessageQueues) {
-                long offset = consumer.fetchConsumeOffset(mq, false);
-                if (offset < 0) {
-                    offset = consumer.minOffset(mq);
-                }
-                log.info("new messageQueue be found in recovery phase.{},Offset:{}", mq, offset);
-                offsetTable.put(mq, offset);
-            }
-        }
-        log.info("init offset table [{}] from restoredOffsets successful.", offsetTable);
-    }
+										// update max eventTime per queue
+										// waterMarkPerQueue.extractTimestamp(mq,
+										// msg.getBornTimestamp());
+										waterMarkForAll.extractTimestamp(msg.getBornTimestamp());
+										tpsMetric.markEvent();
+										long eventTime = msg.getStoreTimestamp();
+										fetchDelay.report(Math.abs(fetchTime - eventTime));
+										emitDelay.report(Math.abs(emitTime - eventTime));
+									}
+								}
+								found = true;
+								break;
+							case NO_MATCHED_MSG:
+								log.debug("No matched message after offset {} for queue {}", offset, mq);
+								break;
+							case NO_NEW_MSG:
+								log.debug("No new message after offset {} for queue {}", offset, mq);
+								break;
+							case OFFSET_ILLEGAL:
+								log.warn("Offset {} is illegal for queue {}", offset, mq);
+								break;
+							default:
+								break;
+						}
 
-    @Override
-    public void snapshotState(FunctionSnapshotContext context) throws Exception {
-        // called when a snapshot for a checkpoint is requested
-        log.info("Snapshotting state {} ...", context.getCheckpointId());
-        if (!runningChecker.isRunning()) {
-            log.info("snapshotState() called on closed source; returning null.");
-            return;
-        }
+						synchronized (checkPointLock) {
+							updateMessageQueueOffset(mq, pullResult.getNextBeginOffset());
+						}
 
-        // Discovers topic route change when snapshot
-        AtomicBoolean isChanged = new AtomicBoolean(false);
-        RetryUtil.call(
-                () -> {
-                    Collection<MessageQueue> totalQueues =
-                            consumer.fetchSubscribeMessageQueues(topic);
-                    int taskNumber = getRuntimeContext().getNumberOfParallelSubtasks();
-                    int taskIndex = getRuntimeContext().getIndexOfThisSubtask();
-                    List<MessageQueue> newQueues =
-                            RocketMQUtils.allocate(totalQueues, taskNumber, taskIndex);
-                    Collections.sort(newQueues);
-                    if (!messageQueues.equals(newQueues)) {
-                        isChanged.set(true);
-                        return false;
-                    }
-                    log.debug(taskIndex + " Topic route is same.");
-                    return true;
-                },
-                "RuntimeException due to topic route changed");
+						if (!found) {
+							RetryUtil.waitForMs(RocketMQConfig.DEFAULT_CONSUMER_DELAY_WHEN_MESSAGE_NOT_FOUND);
+						}
+					}
+					catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+				}
+				return true;
+			}, "RuntimeException", runningChecker));
+		}
 
-        // If topic route changed, the exception will switch the job's state from RUNNING to
-        // FAILED.So that job could recover automatically
-        if (isChanged.get()) {
-            throw new RuntimeException("RuntimeException due to topic route changed.");
-        }
+		awaitTermination();
+		// The exception in thread pools should be thrown in main thread.Then the job
+		// would switch
+		// from state RUNNING to FAILED.
+		if (runningChecker.isFailed()) {
+			throw new RuntimeException("RunningChecker is failed, Please check the log in consumer thread");
+		}
+	}
 
-        unionOffsetStates.clear();
-        Map<MessageQueue, Long> currentOffsets = new HashMap<>(offsetTable.size());
-        for (Map.Entry<MessageQueue, Long> entry : offsetTable.entrySet()) {
-            unionOffsetStates.add(Tuple2.of(entry.getKey(), entry.getValue()));
-            currentOffsets.put(entry.getKey(), entry.getValue());
-        }
-        pendingOffsetsToCommit.put(context.getCheckpointId(), currentOffsets);
-        log.info(
-                "Snapshot state, last processed offsets: {}, checkpoint id: {}, timestamp: {}",
-                offsetTable,
-                context.getCheckpointId(),
-                context.getCheckpointTimestamp());
-    }
+	private void awaitTermination() throws InterruptedException {
+		while (runningChecker.isRunning()) {
+			Thread.sleep(50);
+		}
+	}
 
-    /**
-     * called every time the user-defined function is initialized, be that when the function is
-     * first initialized or be that when the function is actually recovering from an earlier
-     * checkpoint. Given this, initializeState() is not only the place where different types of
-     * state are initialized, but also where state recovery logic is included.
-     */
-    @Override
-    public void initializeState(FunctionInitializationContext context) throws Exception {
-        log.info("initialize State ...");
+	/** consume from the min offset at every restart with no state */
+	public RocketMQSourceFunction<OUT> setStartFromEarliest() {
+		this.startMode = StartupMode.EARLIEST;
+		return this;
+	}
 
-        this.unionOffsetStates =
-                context.getOperatorStateStore()
-                        .getUnionListState(
-                                new ListStateDescriptor<>(
-                                        OFFSETS_STATE_NAME,
-                                        TypeInformation.of(
-                                                new TypeHint<Tuple2<MessageQueue, Long>>() {})));
-        this.restored = context.isRestored();
+	/**
+	 * consume from the max offset of each broker's queue at every restart with no state
+	 */
+	public RocketMQSourceFunction<OUT> setStartFromLatest() {
+		this.startMode = StartupMode.LATEST;
+		return this;
+	}
 
-        if (restored) {
-            if (restoredOffsets == null) {
-                restoredOffsets = new ConcurrentHashMap<>();
-            }
-            for (Tuple2<MessageQueue, Long> mqOffsets : unionOffsetStates.get()) {
-                if (!restoredOffsets.containsKey(mqOffsets.f0)
-                        || restoredOffsets.get(mqOffsets.f0) < mqOffsets.f1) {
-                    restoredOffsets.put(mqOffsets.f0, mqOffsets.f1);
-                }
-            }
-            log.info(
-                    "Setting restore state in the consumer. Using the following offsets: {}",
-                    restoredOffsets);
-        } else {
-            log.info("No restore state for the consumer.");
-        }
-    }
+	/** consume from the closest offset */
+	public RocketMQSourceFunction<OUT> setStartFromTimeStamp(long timeStamp) {
+		this.startMode = StartupMode.TIMESTAMP;
+		this.specificTimeStamp = timeStamp;
+		return this;
+	}
 
-    @Override
-    public TypeInformation<OUT> getProducedType() {
-        return schema.getProducedType();
-    }
+	/** consume from the group offsets those was stored in brokers. */
+	public RocketMQSourceFunction<OUT> setStartFromGroupOffsets() {
+		this.startMode = StartupMode.GROUP_OFFSETS;
+		return this;
+	}
 
-    @Override
-    public void notifyCheckpointComplete(long checkpointId) throws Exception {
-        // callback when checkpoint complete
-        if (!runningChecker.isRunning()) {
-            log.info("notifyCheckpointComplete() called on closed source; returning null.");
-            return;
-        }
+	/**
+	 * consume from the group offsets those was stored in brokers. If there is no
+	 * committed offset,#{@link OffsetResetStrategy} would provide initialization policy.
+	 */
+	public RocketMQSourceFunction<OUT> setStartFromGroupOffsets(OffsetResetStrategy offsetResetStrategy) {
+		this.startMode = StartupMode.GROUP_OFFSETS;
+		this.offsetResetStrategy = offsetResetStrategy;
+		return this;
+	}
 
-        final int posInMap = pendingOffsetsToCommit.indexOf(checkpointId);
-        if (posInMap == -1) {
-            log.warn("Received confirmation for unknown checkpoint id {}", checkpointId);
-            return;
-        }
+	/**
+	 * consume from the specific offset. Group offsets is enable while the broker didn't
+	 * specify offset.
+	 */
+	public RocketMQSourceFunction<OUT> setStartFromSpecificOffsets(Map<MessageQueue, Long> specificOffsets) {
+		this.specificStartupOffsets = specificOffsets;
+		this.startMode = StartupMode.SPECIFIC_OFFSETS;
+		return this;
+	}
 
-        Map<MessageQueue, Long> offsets =
-                (Map<MessageQueue, Long>) pendingOffsetsToCommit.remove(posInMap);
+	private void updateMessageQueueOffset(MessageQueue mq, long offset) throws MQClientException {
+		offsetTable.put(mq, offset);
+		if (!enableCheckpoint) {
+			consumer.updateConsumeOffset(mq, offset);
+			consumer.getOffsetStore().persist(consumer.queueWithNamespace(mq));
+		}
+	}
 
-        // remove older checkpoints in map
-        for (int i = 0; i < posInMap; i++) {
-            pendingOffsetsToCommit.remove(0);
-        }
+	@Override
+	public void cancel() {
+		log.debug("cancel ...");
+		runningChecker.setState(RunningChecker.State.FINISHED);
 
-        if (offsets == null || offsets.size() == 0) {
-            log.debug("Checkpoint state was empty.");
-            return;
-        }
+		if (timer != null) {
+			timer.shutdown();
+			timer = null;
+		}
 
-        for (Map.Entry<MessageQueue, Long> entry : offsets.entrySet()) {
-            consumer.updateConsumeOffset(entry.getKey(), entry.getValue());
-            consumer.getOffsetStore().persist(consumer.queueWithNamespace(entry.getKey()));
-        }
-    }
+		if (executor != null) {
+			executor.shutdown();
+			executor = null;
+		}
+
+		if (consumer != null) {
+			consumer.shutdown();
+			consumer = null;
+		}
+
+		if (offsetTable != null) {
+			offsetTable.clear();
+			offsetTable = null;
+		}
+		if (restoredOffsets != null) {
+			restoredOffsets.clear();
+			restoredOffsets = null;
+		}
+		if (pendingOffsetsToCommit != null) {
+			pendingOffsetsToCommit.clear();
+			pendingOffsetsToCommit = null;
+		}
+	}
+
+	@Override
+	public void close() throws Exception {
+		log.debug("close ...");
+		// pretty much the same logic as cancelling
+		try {
+			cancel();
+		}
+		finally {
+			super.close();
+		}
+	}
+
+	public void initOffsetTableFromRestoredOffsets(List<MessageQueue> messageQueues) throws MQClientException {
+		Preconditions.checkNotNull(restoredOffsets, "restoredOffsets can't be null");
+		restoredOffsets.forEach((mq, offset) -> {
+			if (messageQueues.contains(mq)) {
+				offsetTable.put(mq, offset);
+			}
+		});
+		// Discovery topic Route change when recover.When a new messageQueue joins.A Legal
+		// offset or
+		// the earliest offset will be used.
+		if (!offsetTable.keySet().containsAll(messageQueues)) {
+			List<MessageQueue> newMessageQueues = messageQueues.stream()
+				.filter(mq -> !offsetTable.containsKey(mq))
+				.collect(Collectors.toList());
+			for (MessageQueue mq : newMessageQueues) {
+				long offset = consumer.fetchConsumeOffset(mq, false);
+				if (offset < 0) {
+					offset = consumer.minOffset(mq);
+				}
+				log.info("new messageQueue be found in recovery phase.{},Offset:{}", mq, offset);
+				offsetTable.put(mq, offset);
+			}
+		}
+		log.info("init offset table [{}] from restoredOffsets successful.", offsetTable);
+	}
+
+	@Override
+	public void snapshotState(FunctionSnapshotContext context) throws Exception {
+		// called when a snapshot for a checkpoint is requested
+		log.info("Snapshotting state {} ...", context.getCheckpointId());
+		if (!runningChecker.isRunning()) {
+			log.info("snapshotState() called on closed source; returning null.");
+			return;
+		}
+
+		// Discovers topic route change when snapshot
+		AtomicBoolean isChanged = new AtomicBoolean(false);
+		RetryUtil.call(() -> {
+			Collection<MessageQueue> totalQueues = consumer.fetchSubscribeMessageQueues(topic);
+			int taskNumber = getRuntimeContext().getNumberOfParallelSubtasks();
+			int taskIndex = getRuntimeContext().getIndexOfThisSubtask();
+			List<MessageQueue> newQueues = RocketMQUtils.allocate(totalQueues, taskNumber, taskIndex);
+			Collections.sort(newQueues);
+			if (!messageQueues.equals(newQueues)) {
+				isChanged.set(true);
+				return false;
+			}
+			log.debug(taskIndex + " Topic route is same.");
+			return true;
+		}, "RuntimeException due to topic route changed");
+
+		// If topic route changed, the exception will switch the job's state from RUNNING
+		// to
+		// FAILED.So that job could recover automatically
+		if (isChanged.get()) {
+			throw new RuntimeException("RuntimeException due to topic route changed.");
+		}
+
+		unionOffsetStates.clear();
+		Map<MessageQueue, Long> currentOffsets = new HashMap<>(offsetTable.size());
+		for (Map.Entry<MessageQueue, Long> entry : offsetTable.entrySet()) {
+			unionOffsetStates.add(Tuple2.of(entry.getKey(), entry.getValue()));
+			currentOffsets.put(entry.getKey(), entry.getValue());
+		}
+		pendingOffsetsToCommit.put(context.getCheckpointId(), currentOffsets);
+		log.info("Snapshot state, last processed offsets: {}, checkpoint id: {}, timestamp: {}", offsetTable,
+				context.getCheckpointId(), context.getCheckpointTimestamp());
+	}
+
+	/**
+	 * called every time the user-defined function is initialized, be that when the
+	 * function is first initialized or be that when the function is actually recovering
+	 * from an earlier checkpoint. Given this, initializeState() is not only the place
+	 * where different types of state are initialized, but also where state recovery logic
+	 * is included.
+	 */
+	@Override
+	public void initializeState(FunctionInitializationContext context) throws Exception {
+		log.info("initialize State ...");
+
+		this.unionOffsetStates = context.getOperatorStateStore()
+			.getUnionListState(new ListStateDescriptor<>(OFFSETS_STATE_NAME,
+					TypeInformation.of(new TypeHint<Tuple2<MessageQueue, Long>>() {
+					})));
+		this.restored = context.isRestored();
+
+		if (restored) {
+			if (restoredOffsets == null) {
+				restoredOffsets = new ConcurrentHashMap<>();
+			}
+			for (Tuple2<MessageQueue, Long> mqOffsets : unionOffsetStates.get()) {
+				if (!restoredOffsets.containsKey(mqOffsets.f0) || restoredOffsets.get(mqOffsets.f0) < mqOffsets.f1) {
+					restoredOffsets.put(mqOffsets.f0, mqOffsets.f1);
+				}
+			}
+			log.info("Setting restore state in the consumer. Using the following offsets: {}", restoredOffsets);
+		}
+		else {
+			log.info("No restore state for the consumer.");
+		}
+	}
+
+	@Override
+	public TypeInformation<OUT> getProducedType() {
+		return schema.getProducedType();
+	}
+
+	@Override
+	public void notifyCheckpointComplete(long checkpointId) throws Exception {
+		// callback when checkpoint complete
+		if (!runningChecker.isRunning()) {
+			log.info("notifyCheckpointComplete() called on closed source; returning null.");
+			return;
+		}
+
+		final int posInMap = pendingOffsetsToCommit.indexOf(checkpointId);
+		if (posInMap == -1) {
+			log.warn("Received confirmation for unknown checkpoint id {}", checkpointId);
+			return;
+		}
+
+		Map<MessageQueue, Long> offsets = (Map<MessageQueue, Long>) pendingOffsetsToCommit.remove(posInMap);
+
+		// remove older checkpoints in map
+		for (int i = 0; i < posInMap; i++) {
+			pendingOffsetsToCommit.remove(0);
+		}
+
+		if (offsets == null || offsets.size() == 0) {
+			log.debug("Checkpoint state was empty.");
+			return;
+		}
+
+		for (Map.Entry<MessageQueue, Long> entry : offsets.entrySet()) {
+			consumer.updateConsumeOffset(entry.getKey(), entry.getValue());
+			consumer.getOffsetStore().persist(consumer.queueWithNamespace(entry.getKey()));
+		}
+	}
+
 }

@@ -23,14 +23,16 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class DefaultTopicSelectorTest {
-    @Test
-    public void getTopic() throws Exception {
-        DefaultTopicSelector selector = new DefaultTopicSelector("rocket");
-        assertEquals("rocket", selector.getTopic(null));
-        assertEquals("", selector.getTag(null));
 
-        selector = new DefaultTopicSelector("rocket", "tg");
-        assertEquals("rocket", selector.getTopic(null));
-        assertEquals("tg", selector.getTag(null));
-    }
+	@Test
+	public void getTopic() throws Exception {
+		DefaultTopicSelector selector = new DefaultTopicSelector("rocket");
+		assertEquals("rocket", selector.getTopic(null));
+		assertEquals("", selector.getTag(null));
+
+		selector = new DefaultTopicSelector("rocket", "tg");
+		assertEquals("rocket", selector.getTopic(null));
+		assertEquals("tg", selector.getTag(null));
+	}
+
 }

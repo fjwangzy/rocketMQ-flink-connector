@@ -49,91 +49,75 @@ import static org.apache.rocketmq.flink.common.RocketMQOptions.PRODUCER_GROUP;
 import static org.apache.rocketmq.flink.common.RocketMQOptions.TOPIC;
 
 /**
- * Defines the {@link DynamicTableSinkFactory} implementation to create {@link
- * RocketMQDynamicTableSink}.
+ * Defines the {@link DynamicTableSinkFactory} implementation to create
+ * {@link RocketMQDynamicTableSink}.
  */
 public class RocketMQDynamicTableSinkFactory implements DynamicTableSinkFactory {
 
-    @Override
-    public String factoryIdentifier() {
-        return "rocketmq";
-    }
+	@Override
+	public String factoryIdentifier() {
+		return "rocketmq";
+	}
 
-    @Override
-    public Set<ConfigOption<?>> requiredOptions() {
-        Set<ConfigOption<?>> requiredOptions = new HashSet<>();
-        requiredOptions.add(TOPIC);
-        requiredOptions.add(PRODUCER_GROUP);
-        requiredOptions.add(NAME_SERVER_ADDRESS);
-        return requiredOptions;
-    }
+	@Override
+	public Set<ConfigOption<?>> requiredOptions() {
+		Set<ConfigOption<?>> requiredOptions = new HashSet<>();
+		requiredOptions.add(TOPIC);
+		requiredOptions.add(PRODUCER_GROUP);
+		requiredOptions.add(NAME_SERVER_ADDRESS);
+		return requiredOptions;
+	}
 
-    @Override
-    public Set<ConfigOption<?>> optionalOptions() {
-        Set<ConfigOption<?>> optionalOptions = new HashSet<>();
-        optionalOptions.add(OPTIONAL_TAG);
-        optionalOptions.add(OPTIONAL_WRITE_RETRY_TIMES);
-        optionalOptions.add(OPTIONAL_WRITE_SLEEP_TIME_MS);
-        optionalOptions.add(OPTIONAL_WRITE_IS_DYNAMIC_TAG);
-        optionalOptions.add(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN);
-        optionalOptions.add(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN_WRITE_INCLUDED);
-        optionalOptions.add(OPTIONAL_WRITE_KEYS_TO_BODY);
-        optionalOptions.add(OPTIONAL_WRITE_KEY_COLUMNS);
-        optionalOptions.add(OPTIONAL_ENCODING);
-        optionalOptions.add(OPTIONAL_FIELD_DELIMITER);
-        optionalOptions.add(OPTIONAL_ACCESS_KEY);
-        optionalOptions.add(OPTIONAL_SECRET_KEY);
-        return optionalOptions;
-    }
+	@Override
+	public Set<ConfigOption<?>> optionalOptions() {
+		Set<ConfigOption<?>> optionalOptions = new HashSet<>();
+		optionalOptions.add(OPTIONAL_TAG);
+		optionalOptions.add(OPTIONAL_WRITE_RETRY_TIMES);
+		optionalOptions.add(OPTIONAL_WRITE_SLEEP_TIME_MS);
+		optionalOptions.add(OPTIONAL_WRITE_IS_DYNAMIC_TAG);
+		optionalOptions.add(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN);
+		optionalOptions.add(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN_WRITE_INCLUDED);
+		optionalOptions.add(OPTIONAL_WRITE_KEYS_TO_BODY);
+		optionalOptions.add(OPTIONAL_WRITE_KEY_COLUMNS);
+		optionalOptions.add(OPTIONAL_ENCODING);
+		optionalOptions.add(OPTIONAL_FIELD_DELIMITER);
+		optionalOptions.add(OPTIONAL_ACCESS_KEY);
+		optionalOptions.add(OPTIONAL_SECRET_KEY);
+		return optionalOptions;
+	}
 
-    @Override
-    public DynamicTableSink createDynamicTableSink(Context context) {
-        FactoryUtil.TableFactoryHelper helper = createTableFactoryHelper(this, context);
-        helper.validate();
-        Map<String, String> rawProperties = context.getCatalogTable().getOptions();
-        Configuration properties = Configuration.fromMap(rawProperties);
-        String topicName = properties.getString(TOPIC);
-        String producerGroup = properties.getString(PRODUCER_GROUP);
-        String nameServerAddress = properties.getString(NAME_SERVER_ADDRESS);
-        String tag = properties.getString(OPTIONAL_TAG);
-        String accessKey = properties.getString(OPTIONAL_ACCESS_KEY);
-        String secretKey = properties.getString(OPTIONAL_SECRET_KEY);
-        String dynamicColumn = properties.getString(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN);
-        String encoding = properties.getString(OPTIONAL_ENCODING);
-        String fieldDelimiter = properties.getString(OPTIONAL_FIELD_DELIMITER);
-        int retryTimes = properties.getInteger(OPTIONAL_WRITE_RETRY_TIMES);
-        long sleepTimeMs = properties.getLong(OPTIONAL_WRITE_SLEEP_TIME_MS);
-        boolean isDynamicTag = properties.getBoolean(OPTIONAL_WRITE_IS_DYNAMIC_TAG);
-        boolean isDynamicTagIncluded =
-                properties.getBoolean(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN_WRITE_INCLUDED);
-        boolean writeKeysToBody = properties.getBoolean(OPTIONAL_WRITE_KEYS_TO_BODY);
-        String keyColumnsConfig = properties.getString(OPTIONAL_WRITE_KEY_COLUMNS);
-        String[] keyColumns = new String[0];
-        if (keyColumnsConfig != null && keyColumnsConfig.length() > 0) {
-            keyColumns = keyColumnsConfig.split(",");
-        }
-        DescriptorProperties descriptorProperties = new DescriptorProperties();
-        descriptorProperties.putProperties(rawProperties);
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+	@Override
+	public DynamicTableSink createDynamicTableSink(Context context) {
+		FactoryUtil.TableFactoryHelper helper = createTableFactoryHelper(this, context);
+		helper.validate();
+		Map<String, String> rawProperties = context.getCatalogTable().getOptions();
+		Configuration properties = Configuration.fromMap(rawProperties);
+		String topicName = properties.getString(TOPIC);
+		String producerGroup = properties.getString(PRODUCER_GROUP);
+		String nameServerAddress = properties.getString(NAME_SERVER_ADDRESS);
+		String tag = properties.getString(OPTIONAL_TAG);
+		String accessKey = properties.getString(OPTIONAL_ACCESS_KEY);
+		String secretKey = properties.getString(OPTIONAL_SECRET_KEY);
+		String dynamicColumn = properties.getString(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN);
+		String encoding = properties.getString(OPTIONAL_ENCODING);
+		String fieldDelimiter = properties.getString(OPTIONAL_FIELD_DELIMITER);
+		int retryTimes = properties.getInteger(OPTIONAL_WRITE_RETRY_TIMES);
+		long sleepTimeMs = properties.getLong(OPTIONAL_WRITE_SLEEP_TIME_MS);
+		boolean isDynamicTag = properties.getBoolean(OPTIONAL_WRITE_IS_DYNAMIC_TAG);
+		boolean isDynamicTagIncluded = properties.getBoolean(OPTIONAL_WRITE_DYNAMIC_TAG_COLUMN_WRITE_INCLUDED);
+		boolean writeKeysToBody = properties.getBoolean(OPTIONAL_WRITE_KEYS_TO_BODY);
+		String keyColumnsConfig = properties.getString(OPTIONAL_WRITE_KEY_COLUMNS);
+		String[] keyColumns = new String[0];
+		if (keyColumnsConfig != null && keyColumnsConfig.length() > 0) {
+			keyColumns = keyColumnsConfig.split(",");
+		}
+		DescriptorProperties descriptorProperties = new DescriptorProperties();
+		descriptorProperties.putProperties(rawProperties);
+		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
-        return new RocketMQDynamicTableSink(
-                descriptorProperties,
-                physicalSchema,
-                topicName,
-                producerGroup,
-                nameServerAddress,
-                accessKey,
-                secretKey,
-                tag,
-                dynamicColumn,
-                fieldDelimiter,
-                encoding,
-                sleepTimeMs,
-                retryTimes,
-                isDynamicTag,
-                isDynamicTagIncluded,
-                writeKeysToBody,
-                keyColumns);
-    }
+		return new RocketMQDynamicTableSink(descriptorProperties, physicalSchema, topicName, producerGroup,
+				nameServerAddress, accessKey, secretKey, tag, dynamicColumn, fieldDelimiter, encoding, sleepTimeMs,
+				retryTimes, isDynamicTag, isDynamicTagIncluded, writeKeysToBody, keyColumns);
+	}
+
 }

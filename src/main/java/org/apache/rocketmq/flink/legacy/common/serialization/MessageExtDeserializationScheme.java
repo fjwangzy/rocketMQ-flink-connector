@@ -29,11 +29,12 @@ import java.io.Serializable;
  * @param <T> the type parameter
  */
 public interface MessageExtDeserializationScheme<T> extends ResultTypeQueryable<T>, Serializable {
-    /**
-     * Deserialize messageExt to type T you want to output.
-     *
-     * @param messageExt the messageExt
-     * @return the t
-     */
-    T deserializeMessageExt(MessageExt messageExt);
+
+	/**
+	 * Deserialize messageExt to type T you want to output.
+	 * @param messageExt the messageExt
+	 * @return the t
+	 */
+	T deserializeMessageExt(MessageExt messageExt);
+
 }

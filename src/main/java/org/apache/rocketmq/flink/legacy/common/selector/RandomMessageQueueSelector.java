@@ -25,11 +25,13 @@ import java.util.List;
 import java.util.Random;
 
 public class RandomMessageQueueSelector implements MessageQueueSelector {
-    private Random random = new Random(System.currentTimeMillis());
 
-    @Override
-    public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
-        int value = random.nextInt(mqs.size());
-        return mqs.get(value);
-    }
+	private Random random = new Random(System.currentTimeMillis());
+
+	@Override
+	public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
+		int value = random.nextInt(mqs.size());
+		return mqs.get(value);
+	}
+
 }

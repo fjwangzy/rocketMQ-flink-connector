@@ -40,35 +40,35 @@ import static org.mockito.Mockito.verify;
 @Ignore
 public class RocketMQSinkTest {
 
-    private RocketMQSink rocketMQSink;
-    private DefaultMQProducer producer;
+	private RocketMQSink rocketMQSink;
 
-    @Before
-    public void setUp() throws Exception {
-        KeyValueSerializationSchema serializationSchema =
-                new SimpleKeyValueSerializationSchema("id", "name");
-        TopicSelector topicSelector = new DefaultTopicSelector("tpc");
-        Properties props = new Properties();
-        props.setProperty(
-                RocketMQConfig.MSG_DELAY_LEVEL, String.valueOf(RocketMQConfig.MSG_DELAY_LEVEL04));
-        rocketMQSink = new RocketMQSink(props);
+	private DefaultMQProducer producer;
 
-        producer = mock(DefaultMQProducer.class);
-        setFieldValue(rocketMQSink, "producer", producer);
-    }
+	@Before
+	public void setUp() throws Exception {
+		KeyValueSerializationSchema serializationSchema = new SimpleKeyValueSerializationSchema("id", "name");
+		TopicSelector topicSelector = new DefaultTopicSelector("tpc");
+		Properties props = new Properties();
+		props.setProperty(RocketMQConfig.MSG_DELAY_LEVEL, String.valueOf(RocketMQConfig.MSG_DELAY_LEVEL04));
+		rocketMQSink = new RocketMQSink(props);
 
-    @Test
-    public void testSink() throws Exception {
-        Tuple2<String, String> tuple = new Tuple2<>("id", "province");
-        String topic = "testTopic";
-        String tag = "testTag";
-        Message message = new Message(topic, tag, tuple.f0, tuple.f1.getBytes());
-    }
+		producer = mock(DefaultMQProducer.class);
+		setFieldValue(rocketMQSink, "producer", producer);
+	}
 
-    @Test
-    public void close() throws Exception {
-        rocketMQSink.close();
+	@Test
+	public void testSink() throws Exception {
+		Tuple2<String, String> tuple = new Tuple2<>("id", "province");
+		String topic = "testTopic";
+		String tag = "testTag";
+		Message message = new Message(topic, tag, tuple.f0, tuple.f1.getBytes());
+	}
 
-        verify(producer).shutdown();
-    }
+	@Test
+	public void close() throws Exception {
+		rocketMQSink.close();
+
+		verify(producer).shutdown();
+	}
+
 }

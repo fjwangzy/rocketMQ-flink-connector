@@ -31,36 +31,36 @@ import java.util.concurrent.Executors;
 @Slf4j
 public class RetryUtilTest extends TestCase {
 
-    public void testCall() {
-        try {
-            User user = new User();
-            RunningChecker runningChecker = new RunningChecker();
-            runningChecker.setState(RunningChecker.State.RUNNING);
-            ExecutorService executorService = Executors.newCachedThreadPool();
-            executorService.execute(
-                    () ->
-                            RetryUtil.call(
-                                    () -> {
-                                        user.setName("test");
-                                        user.setAge(Integer.parseInt("12e"));
-                                        return true;
-                                    },
-                                    "Something is error",
-                                    runningChecker));
-            Thread.sleep(10000);
-            executorService.shutdown();
-            log.info("Thread has finished");
-            assertEquals(0, user.age);
-            assertEquals("test", user.name);
-            assertEquals(false, runningChecker.isRunning());
-        } catch (Exception e) {
-            log.warn("Exception has been caught");
-        }
-    }
+	public void testCall() {
+		try {
+			User user = new User();
+			RunningChecker runningChecker = new RunningChecker();
+			runningChecker.setState(RunningChecker.State.RUNNING);
+			ExecutorService executorService = Executors.newCachedThreadPool();
+			executorService.execute(() -> RetryUtil.call(() -> {
+				user.setName("test");
+				user.setAge(Integer.parseInt("12e"));
+				return true;
+			}, "Something is error", runningChecker));
+			Thread.sleep(10000);
+			executorService.shutdown();
+			log.info("Thread has finished");
+			assertEquals(0, user.age);
+			assertEquals("test", user.name);
+			assertEquals(false, runningChecker.isRunning());
+		}
+		catch (Exception e) {
+			log.warn("Exception has been caught");
+		}
+	}
 
-    @Data
-    public class User {
-        String name;
-        int age;
-    }
+	@Data
+	public class User {
+
+		String name;
+
+		int age;
+
+	}
+
 }

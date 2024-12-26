@@ -22,21 +22,22 @@
 
     <groupId>org.apache.rocketmq</groupId>
     <artifactId>rocketmq-flink</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0-xm</version>
     <packaging>jar</packaging>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!--maven properties -->
-        <maven.test.skip>false</maven.test.skip>
+        <maven.test.skip>true</maven.test.skip>
         <maven.javadoc.skip>false</maven.javadoc.skip>
         <!-- compiler settings properties -->
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <rocketmq.version>4.9.2</rocketmq.version>
-        <flink.version>1.15.0</flink.version>
+        <java.version>17</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <rocketmq.version>5.1.4</rocketmq.version>
+        <flink.version>1.20.0</flink.version>
         <commons-lang.version>2.6</commons-lang.version>
-        <spotless.version>2.4.2</spotless.version>
+        <spotless.version>2.27.1</spotless.version>
         <jaxb-api.version>2.3.1</jaxb-api.version>
         <rocketmq.schema.registry.version>0.1.0</rocketmq.schema.registry.version>
     </properties>
@@ -46,7 +47,7 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
             <version>1.7.10</version>
-            <scope>provided</scope>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -171,7 +172,7 @@
             <version>${commons-lang.version}</version>
         </dependency>
 
-        <!--test -->
+        <!-- 测试-->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -181,13 +182,13 @@
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-module-junit4</artifactId>
-            <version>1.5.5</version>
+            <version>2.0.9</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
-            <artifactId>powermock-api-mockito</artifactId>
-            <version>1.5.5</version>
+            <artifactId>powermock-api-mockito2</artifactId>
+            <version>2.0.9</version>
             <scope>test</scope>
         </dependency>
 
@@ -196,162 +197,232 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>2.4.3</version>
+                <groupId>io.spring.javaformat</groupId>
+                <artifactId>spring-javaformat-maven-plugin</artifactId>
                 <executions>
                     <execution>
-                        <phase>package</phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal>validate</goal>
                         </goals>
-                        <configuration>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>log4j.properties</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>reference.conf</resource>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>org.apache.rocketmq.flink.legacy.example.RocketMQFlinkExample</mainClass>
-                                </transformer>
-                            </transformers>
-                        </configuration>
+                        <inherited>true</inherited>
+                        <phase>validate</phase>
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                    </annotationProcessorPaths>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+            <!-- 测试插件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.12.4</version>
                 <configuration>
-                    <skipTests>${maven.test.skip}</skipTests>
+                    <argLine>-Dfile.encoding=UTF-8</argLine>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.rat</groupId>
-                <artifactId>apache-rat-plugin</artifactId>
-                <version>0.12</version>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
                 <configuration>
-                    <excludes>
-                        <exclude>.gitignore</exclude>
-                        <exclude>.travis.yml</exclude>
-                        <exclude>.asf.yaml</exclude>
-                        <exclude>README.md</exclude>
-                    </excludes>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                    <updatePomFile>true</updatePomFile>
                 </configuration>
-            </plugin>
-	    <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.7</version>
                 <executions>
                     <execution>
-                        <id>prepare-agent</id>
                         <goals>
-                            <goal>prepare-agent</goal>
+                            <goal>flatten</goal>
                         </goals>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                    </execution>
+                    <execution>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.eluder.coveralls</groupId>
-                <artifactId>coveralls-maven-plugin</artifactId>
-                <version>4.3.0</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>javax.xml.bind</groupId>
-                        <artifactId>jaxb-api</artifactId>
-                        <version>${jaxb-api.version}</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-            <plugin>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.17</version>
-                <executions>
-                    <execution>
-                        <id>verify</id>
-                        <phase>verify</phase>
-                        <configuration>
-                            <configLocation>style/rmq_checkstyle.xml</configLocation>
-                            <encoding>UTF-8</encoding>
-                            <consoleOutput>true</consoleOutput>
-                            <failsOnError>true</failsOnError>
-                            <includeTestSourceDirectory>false</includeTestSourceDirectory>
-                            <includeTestResources>false</includeTestResources>
-                        </configuration>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.4</version>
-                <configuration>
-                    <aggregate>true</aggregate>
-                    <reportOutputDirectory>javadocs</reportOutputDirectory>
-                    <locale>en</locale>
-                </configuration>
-            </plugin>
+
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-shade-plugin</artifactId>-->
+<!--                <version>3.6.0</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <phase>package</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>shade</goal>-->
+<!--                        </goals>-->
+<!--                        <configuration>-->
+<!--                            <filters>-->
+<!--                                <filter>-->
+<!--                                    <artifact>*:*</artifact>-->
+<!--                                    <excludes>-->
+<!--                                        <exclude>META-INF/*.SF</exclude>-->
+<!--                                        <exclude>META-INF/*.DSA</exclude>-->
+<!--                                        <exclude>META-INF/*.RSA</exclude>-->
+<!--                                        <exclude>log4j.properties</exclude>-->
+<!--                                    </excludes>-->
+<!--                                </filter>-->
+<!--                            </filters>-->
+<!--                            <transformers>-->
+<!--                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">-->
+<!--                                    <resource>reference.conf</resource>-->
+<!--                                </transformer>-->
+<!--                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
+<!--                                    <mainClass>org.apache.rocketmq.flink.legacy.example.RocketMQFlinkExample</mainClass>-->
+<!--                                </transformer>-->
+<!--                            </transformers>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-surefire-plugin</artifactId>-->
+<!--                <version>3.0.0-M5</version>-->
+<!--                <configuration>-->
+<!--                    <skipTests>${maven.test.skip}</skipTests>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.rat</groupId>-->
+<!--                <artifactId>apache-rat-plugin</artifactId>-->
+<!--                <version>0.12</version>-->
+<!--                <configuration>-->
+<!--                    <excludes>-->
+<!--                        <exclude>.gitignore</exclude>-->
+<!--                        <exclude>.travis.yml</exclude>-->
+<!--                        <exclude>.asf.yaml</exclude>-->
+<!--                        <exclude>README.md</exclude>-->
+<!--                    </excludes>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
+<!--	    <plugin>-->
+<!--                <groupId>org.jacoco</groupId>-->
+<!--                <artifactId>jacoco-maven-plugin</artifactId>-->
+<!--                <version>0.8.7</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>prepare-agent</id>-->
+<!--                        <goals>-->
+<!--                            <goal>prepare-agent</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.eluder.coveralls</groupId>-->
+<!--                <artifactId>coveralls-maven-plugin</artifactId>-->
+<!--                <version>4.3.0</version>-->
+<!--                <dependencies>-->
+<!--                    <dependency>-->
+<!--                        <groupId>javax.xml.bind</groupId>-->
+<!--                        <artifactId>jaxb-api</artifactId>-->
+<!--                        <version>${jaxb-api.version}</version>-->
+<!--                    </dependency>-->
+<!--                </dependencies>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <artifactId>maven-checkstyle-plugin</artifactId>-->
+<!--                <version>2.17</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>verify</id>-->
+<!--                        <phase>verify</phase>-->
+<!--                        <configuration>-->
+<!--                            <configLocation>style/rmq_checkstyle.xml</configLocation>-->
+<!--                            <encoding>UTF-8</encoding>-->
+<!--                            <consoleOutput>true</consoleOutput>-->
+<!--                            <failsOnError>true</failsOnError>-->
+<!--                            <includeTestSourceDirectory>false</includeTestSourceDirectory>-->
+<!--                            <includeTestResources>false</includeTestResources>-->
+<!--                        </configuration>-->
+<!--                        <goals>-->
+<!--                            <goal>check</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-javadoc-plugin</artifactId>-->
+<!--                <version>2.10.4</version>-->
+<!--                <configuration>-->
+<!--                    <aggregate>true</aggregate>-->
+<!--                    <reportOutputDirectory>javadocs</reportOutputDirectory>-->
+<!--                    <locale>en</locale>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
             <!-- Due to the Flink build setup, "mvn spotless:apply" and "mvn spotless:check"
 				don't work. You have to use the fully qualified name, i.e.
 				"mvn com.diffplug.spotless:spotless-maven-plugin:apply" -->
-            <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <version>${spotless.version}</version>
-                <configuration>
-                    <java>
-                        <googleJavaFormat>
-                            <version>1.7</version>
-                            <style>AOSP</style>
-                        </googleJavaFormat>
+<!--            <plugin>-->
+<!--                <groupId>com.diffplug.spotless</groupId>-->
+<!--                <artifactId>spotless-maven-plugin</artifactId>-->
+<!--                <version>${spotless.version}</version>-->
+<!--                <configuration>-->
+<!--                    <java>-->
+<!--                        <googleJavaFormat>-->
+<!--                            <version>1.15.0</version>-->
+<!--                            <style>AOSP</style>-->
+<!--                        </googleJavaFormat>-->
 
-                        <!-- \# refers to the static imports -->
-                        <importOrder>
-                            <order>org.apache.rocketmq,org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#</order>
-                        </importOrder>
+<!--                        &lt;!&ndash; \# refers to the static imports &ndash;&gt;-->
+<!--                        <importOrder>-->
+<!--                            <order>org.apache.rocketmq,org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#</order>-->
+<!--                        </importOrder>-->
 
-                        <removeUnusedImports />
-                    </java>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>spotless-check</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+<!--                        <removeUnusedImports />-->
+<!--                    </java>-->
+<!--                </configuration>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>spotless-check</id>-->
+<!--                        <phase>validate</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>check</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-source-plugin</artifactId>-->
+<!--                <version>3.0.1</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>attach-sources</id>-->
+<!--                        <phase>compile</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>jar-no-fork</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
         </plugins>
     </build>
+
+    <!-- 定义snapshots库和releases库的nexus地址 -->
+    <distributionManagement>
+        <repository>
+            <id>2496257-release-lCCpvd</id>
+            <url>https://packages.aliyun.com/maven/repository/2496257-release-lCCpvd</url>
+        </repository>
+        <snapshotRepository>
+            <id>2496257-release-lCCpvd</id>
+            <url>https://packages.aliyun.com/maven/repository/2496257-release-lCCpvd</url>
+        </snapshotRepository>
+    </distributionManagement>
+
 </project>

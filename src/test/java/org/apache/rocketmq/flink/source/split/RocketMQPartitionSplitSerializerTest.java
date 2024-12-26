@@ -27,18 +27,13 @@ import static org.junit.Assert.assertEquals;
 /** Test for {@link RocketMQPartitionSplitSerializer}. */
 public class RocketMQPartitionSplitSerializerTest {
 
-    @Test
-    public void testSerializePartitionSplit() throws IOException {
-        RocketMQPartitionSplitSerializer serializer = new RocketMQPartitionSplitSerializer();
-        RocketMQPartitionSplit expected =
-                new RocketMQPartitionSplit(
-                        "test-split-serialization",
-                        "taobaodaily",
-                        256,
-                        100,
-                        System.currentTimeMillis());
-        RocketMQPartitionSplit actual =
-                serializer.deserialize(serializer.getVersion(), serializer.serialize(expected));
-        assertEquals(expected, actual);
-    }
+	@Test
+	public void testSerializePartitionSplit() throws IOException {
+		RocketMQPartitionSplitSerializer serializer = new RocketMQPartitionSplitSerializer();
+		RocketMQPartitionSplit expected = new RocketMQPartitionSplit("test-split-serialization", "taobaodaily", 256,
+				100, System.currentTimeMillis());
+		RocketMQPartitionSplit actual = serializer.deserialize(serializer.getVersion(), serializer.serialize(expected));
+		assertEquals(expected, actual);
+	}
+
 }

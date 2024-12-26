@@ -26,76 +26,73 @@ import java.util.Objects;
 /** A {@link SourceSplit} for a RocketMQ partition. */
 public class RocketMQPartitionSplit implements SourceSplit {
 
-    private final String topic;
-    private final String broker;
-    private final int partition;
-    private final long startingOffset;
-    private final long stoppingTimestamp;
+	private final String topic;
 
-    public RocketMQPartitionSplit(
-            String topic,
-            String broker,
-            int partition,
-            long startingOffset,
-            long stoppingTimestamp) {
-        this.topic = topic;
-        this.broker = broker;
-        this.partition = partition;
-        this.startingOffset = startingOffset;
-        this.stoppingTimestamp = stoppingTimestamp;
-    }
+	private final String broker;
 
-    public String getTopic() {
-        return topic;
-    }
+	private final int partition;
 
-    public String getBroker() {
-        return broker;
-    }
+	private final long startingOffset;
 
-    public int getPartition() {
-        return partition;
-    }
+	private final long stoppingTimestamp;
 
-    public long getStartingOffset() {
-        return startingOffset;
-    }
+	public RocketMQPartitionSplit(String topic, String broker, int partition, long startingOffset,
+			long stoppingTimestamp) {
+		this.topic = topic;
+		this.broker = broker;
+		this.partition = partition;
+		this.startingOffset = startingOffset;
+		this.stoppingTimestamp = stoppingTimestamp;
+	}
 
-    public long getStoppingTimestamp() {
-        return stoppingTimestamp;
-    }
+	public String getTopic() {
+		return topic;
+	}
 
-    @Override
-    public String splitId() {
-        return topic + "-" + broker + "-" + partition;
-    }
+	public String getBroker() {
+		return broker;
+	}
 
-    @Override
-    public String toString() {
-        return String.format(
-                "[Topic: %s, Broker: %s, Partition: %s, StartingOffset: %d, StoppingTimestamp: %d]",
-                topic, broker, partition, startingOffset, stoppingTimestamp);
-    }
+	public int getPartition() {
+		return partition;
+	}
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(topic, broker, partition, startingOffset, stoppingTimestamp);
-    }
+	public long getStartingOffset() {
+		return startingOffset;
+	}
 
-    @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof RocketMQPartitionSplit)) {
-            return false;
-        }
-        RocketMQPartitionSplit other = (RocketMQPartitionSplit) obj;
-        return topic.equals(other.topic)
-                && broker.equals(other.broker)
-                && partition == other.partition
-                && startingOffset == other.startingOffset
-                && stoppingTimestamp == other.stoppingTimestamp;
-    }
+	public long getStoppingTimestamp() {
+		return stoppingTimestamp;
+	}
 
-    public static String toSplitId(Tuple3<String, String, Integer> topicPartition) {
-        return topicPartition.f0 + "-" + topicPartition.f1 + "-" + topicPartition.f2;
-    }
+	@Override
+	public String splitId() {
+		return topic + "-" + broker + "-" + partition;
+	}
+
+	@Override
+	public String toString() {
+		return String.format("[Topic: %s, Broker: %s, Partition: %s, StartingOffset: %d, StoppingTimestamp: %d]", topic,
+				broker, partition, startingOffset, stoppingTimestamp);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(topic, broker, partition, startingOffset, stoppingTimestamp);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (!(obj instanceof RocketMQPartitionSplit)) {
+			return false;
+		}
+		RocketMQPartitionSplit other = (RocketMQPartitionSplit) obj;
+		return topic.equals(other.topic) && broker.equals(other.broker) && partition == other.partition
+				&& startingOffset == other.startingOffset && stoppingTimestamp == other.stoppingTimestamp;
+	}
+
+	public static String toSplitId(Tuple3<String, String, Integer> topicPartition) {
+		return topicPartition.f0 + "-" + topicPartition.f1 + "-" + topicPartition.f2;
+	}
+
 }

@@ -19,11 +19,12 @@
 package org.apache.rocketmq.flink.source.reader;
 
 /**
- * A callback interface that user can implement to trigger custom actions when a commit request
- * completes.
+ * A callback interface that user can implement to trigger custom actions when a commit
+ * request completes.
  */
 public interface OffsetCommitCallback {
 
-    /** This method will be called when the commit request has been acknowledged. */
-    void onComplete();
+	/** This method will be called when the commit request has been acknowledged. */
+	void onComplete();
+
 }

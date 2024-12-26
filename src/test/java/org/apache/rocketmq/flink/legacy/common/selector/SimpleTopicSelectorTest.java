@@ -26,23 +26,25 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 
 public class SimpleTopicSelectorTest {
-    @Test
-    public void getTopic() throws Exception {
-        SimpleTopicSelector selector = new SimpleTopicSelector("tpc", "dtpc", "tg", "dtg");
-        Map tuple = new HashMap();
-        tuple.put("id", "x001");
-        tuple.put("name", "vesense");
-        tuple.put("tpc", "tpc1");
-        tuple.put("tg", "tg1");
 
-        assertEquals("tpc1", selector.getTopic(tuple));
-        assertEquals("tg1", selector.getTag(tuple));
+	@Test
+	public void getTopic() throws Exception {
+		SimpleTopicSelector selector = new SimpleTopicSelector("tpc", "dtpc", "tg", "dtg");
+		Map tuple = new HashMap();
+		tuple.put("id", "x001");
+		tuple.put("name", "vesense");
+		tuple.put("tpc", "tpc1");
+		tuple.put("tg", "tg1");
 
-        tuple = new HashMap();
-        tuple.put("id", "x001");
-        tuple.put("name", "vesense");
+		assertEquals("tpc1", selector.getTopic(tuple));
+		assertEquals("tg1", selector.getTag(tuple));
 
-        assertEquals("dtpc", selector.getTopic(tuple));
-        assertEquals("dtg", selector.getTag(tuple));
-    }
+		tuple = new HashMap();
+		tuple.put("id", "x001");
+		tuple.put("name", "vesense");
+
+		assertEquals("dtpc", selector.getTopic(tuple));
+		assertEquals("dtg", selector.getTag(tuple));
+	}
+
 }

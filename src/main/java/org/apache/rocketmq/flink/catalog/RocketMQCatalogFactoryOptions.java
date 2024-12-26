@@ -30,24 +30,25 @@ import org.apache.flink.table.catalog.CommonCatalogOptions;
 @Internal
 public final class RocketMQCatalogFactoryOptions {
 
-    public static final String IDENTIFIER = "rocketmq_catalog";
+	public static final String IDENTIFIER = "rocketmq_catalog";
 
-    public static final ConfigOption<String> DEFAULT_DATABASE =
-            ConfigOptions.key(CommonCatalogOptions.DEFAULT_DATABASE_KEY)
-                    .stringType()
-                    .defaultValue(RocketMQCatalog.DEFAULT_DB);
+	public static final ConfigOption<String> DEFAULT_DATABASE = ConfigOptions
+		.key(CommonCatalogOptions.DEFAULT_DATABASE_KEY)
+		.stringType()
+		.defaultValue(RocketMQCatalog.DEFAULT_DB);
 
-    public static final ConfigOption<String> NAME_SERVER_ADDR =
-            ConfigOptions.key(RocketMQConfig.NAME_SERVER_ADDR)
-                    .stringType()
-                    .defaultValue("http://localhost:9876")
-                    .withDescription("Required rocketmq name server address");
+	public static final ConfigOption<String> NAME_SERVER_ADDR = ConfigOptions.key(RocketMQConfig.NAME_SERVER_ADDR)
+		.stringType()
+		.defaultValue("http://localhost:9876")
+		.withDescription("Required rocketmq name server address");
 
-    public static final ConfigOption<String> SCHEMA_REGISTRY_BASE_URL =
-            ConfigOptions.key(SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL_KEY)
-                    .stringType()
-                    .defaultValue(SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL)
-                    .withDescription("Required schema registry server address");
+	public static final ConfigOption<String> SCHEMA_REGISTRY_BASE_URL = ConfigOptions
+		.key(SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL_KEY)
+		.stringType()
+		.defaultValue(SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL)
+		.withDescription("Required schema registry server address");
 
-    private RocketMQCatalogFactoryOptions() {}
+	private RocketMQCatalogFactoryOptions() {
+	}
+
 }

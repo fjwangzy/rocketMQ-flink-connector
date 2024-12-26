@@ -26,13 +26,14 @@ import java.util.Map;
 /** The state of RocketMQ source enumerator. */
 public class RocketMQSourceEnumState {
 
-    private final Map<Integer, List<RocketMQPartitionSplit>> currentAssignment;
+	private final Map<Integer, List<RocketMQPartitionSplit>> currentAssignment;
 
-    RocketMQSourceEnumState(Map<Integer, List<RocketMQPartitionSplit>> currentAssignment) {
-        this.currentAssignment = currentAssignment;
-    }
+	RocketMQSourceEnumState(Map<Integer, List<RocketMQPartitionSplit>> currentAssignment) {
+		this.currentAssignment = currentAssignment;
+	}
 
-    public Map<Integer, List<RocketMQPartitionSplit>> getCurrentAssignment() {
-        return currentAssignment;
-    }
+	public Map<Integer, List<RocketMQPartitionSplit>> getCurrentAssignment() {
+		return currentAssignment;
+	}
+
 }

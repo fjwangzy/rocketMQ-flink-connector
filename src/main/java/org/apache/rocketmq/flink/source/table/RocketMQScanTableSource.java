@@ -56,245 +56,200 @@ import static org.apache.flink.api.connector.source.Boundedness.CONTINUOUS_UNBOU
 /** Defines the scan table source of RocketMQ. */
 public class RocketMQScanTableSource implements ScanTableSource, SupportsReadingMetadata {
 
-    private final DescriptorProperties properties;
-    private final TableSchema schema;
+	private final DescriptorProperties properties;
 
-    private final String topic;
-    private final String consumerGroup;
-    private final String nameServerAddress;
-    private final String tag;
-    private final String sql;
+	private final TableSchema schema;
 
-    private final String accessKey;
-    private final String secretKey;
+	private final String topic;
 
-    private final long stopInMs;
-    private final long partitionDiscoveryIntervalMs;
-    private final boolean useNewApi;
-    private final boolean commitOffsetAuto;
+	private final String consumerGroup;
 
-    // consumer strategy
-    private final StartupMode startMode;
-    private final OffsetResetStrategy offsetResetStrategy;
-    private final Map<MessageQueue, Long> specificOffsets;
-    private final long consumerOffsetTimestamp;
+	private final String nameServerAddress;
 
-    private List<String> metadataKeys;
+	private final String tag;
 
-    public RocketMQScanTableSource(
-            DescriptorProperties properties,
-            TableSchema schema,
-            String topic,
-            String consumerGroup,
-            String nameServerAddress,
-            String accessKey,
-            String secretKey,
-            String tag,
-            String sql,
-            long stopInMs,
-            boolean useNewApi,
-            long partitionDiscoveryIntervalMs,
-            StartupMode startMode,
-            OffsetResetStrategy offsetResetStrategy,
-            Map<MessageQueue, Long> specificOffsets,
-            long consumerOffsetTimestamp,
-            boolean commitOffsetAuto) {
-        this.properties = properties;
-        this.schema = schema;
-        this.topic = topic;
-        this.consumerGroup = consumerGroup;
-        this.nameServerAddress = nameServerAddress;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
-        this.tag = tag;
-        this.sql = sql;
-        this.stopInMs = stopInMs;
-        this.partitionDiscoveryIntervalMs = partitionDiscoveryIntervalMs;
-        this.useNewApi = useNewApi;
-        this.metadataKeys = Collections.emptyList();
-        this.startMode = startMode;
-        this.offsetResetStrategy = offsetResetStrategy;
-        this.specificOffsets = specificOffsets;
-        this.consumerOffsetTimestamp = consumerOffsetTimestamp;
-        this.commitOffsetAuto = commitOffsetAuto;
-    }
+	private final String sql;
 
-    @Override
-    public ChangelogMode getChangelogMode() {
-        return ChangelogMode.insertOnly();
-    }
+	private final String accessKey;
 
-    @Override
-    public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        if (useNewApi) {
-            return SourceProvider.of(
-                    new RocketMQSource<>(
-                            topic,
-                            consumerGroup,
-                            nameServerAddress,
-                            accessKey,
-                            secretKey,
-                            tag,
-                            sql,
-                            stopInMs,
-                            partitionDiscoveryIntervalMs,
-                            isBounded() ? BOUNDED : CONTINUOUS_UNBOUNDED,
-                            createRocketMQDeserializationSchema(),
-                            startMode,
-                            offsetResetStrategy,
-                            specificOffsets,
-                            consumerOffsetTimestamp,
-                            commitOffsetAuto));
-        } else {
-            RocketMQSourceFunction<RowData> rocketMQSource =
-                    new RocketMQSourceFunction<>(
-                            createKeyValueDeserializationSchema(), getConsumerProps());
-            setStartupMode(
-                    rocketMQSource,
-                    startMode,
-                    offsetResetStrategy,
-                    specificOffsets,
-                    consumerOffsetTimestamp);
-            return SourceFunctionProvider.of(rocketMQSource, isBounded());
-        }
-    }
+	private final String secretKey;
 
-    @Override
-    public Map<String, DataType> listReadableMetadata() {
-        final Map<String, DataType> metadataMap = new LinkedHashMap<>();
-        Stream.of(ReadableMetadata.values())
-                .forEachOrdered(m -> metadataMap.putIfAbsent(m.key, m.dataType));
-        return metadataMap;
-    }
+	private final long stopInMs;
 
-    @Override
-    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
-        this.metadataKeys = metadataKeys;
-    }
+	private final long partitionDiscoveryIntervalMs;
 
-    @Override
-    public DynamicTableSource copy() {
-        RocketMQScanTableSource tableSource =
-                new RocketMQScanTableSource(
-                        properties,
-                        schema,
-                        topic,
-                        consumerGroup,
-                        nameServerAddress,
-                        accessKey,
-                        secretKey,
-                        tag,
-                        sql,
-                        stopInMs,
-                        useNewApi,
-                        partitionDiscoveryIntervalMs,
-                        startMode,
-                        offsetResetStrategy,
-                        specificOffsets,
-                        consumerOffsetTimestamp,
-                        commitOffsetAuto);
-        tableSource.metadataKeys = metadataKeys;
-        return tableSource;
-    }
+	private final boolean useNewApi;
 
-    @Override
-    public String asSummaryString() {
-        return RocketMQScanTableSource.class.getName();
-    }
+	private final boolean commitOffsetAuto;
 
-    private RocketMQDeserializationSchema<RowData> createRocketMQDeserializationSchema() {
-        final MetadataConverter[] metadataConverters =
-                metadataKeys.stream()
-                        .map(
-                                k ->
-                                        Stream.of(ReadableMetadata.values())
-                                                .filter(rm -> rm.key.equals(k))
-                                                .findFirst()
-                                                .orElseThrow(IllegalStateException::new))
-                        .map(m -> m.converter)
-                        .toArray(MetadataConverter[]::new);
-        return new RocketMQRowDeserializationSchema(
-                schema, properties.asMap(), metadataKeys.size() > 0, metadataConverters);
-    }
+	// consumer strategy
+	private final StartupMode startMode;
 
-    private boolean isBounded() {
-        return stopInMs != Long.MAX_VALUE;
-    }
+	private final OffsetResetStrategy offsetResetStrategy;
 
-    private KeyValueDeserializationSchema<RowData> createKeyValueDeserializationSchema() {
-        return new RowKeyValueDeserializationSchema.Builder()
-                .setProperties(properties.asMap())
-                .setTableSchema(schema)
-                .build();
-    }
+	private final Map<MessageQueue, Long> specificOffsets;
 
-    private Properties getConsumerProps() {
-        Properties consumerProps = new Properties();
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_TOPIC, topic);
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_GROUP, consumerGroup);
-        consumerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR, nameServerAddress);
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_TAG, tag);
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_SQL, sql);
-        consumerProps.setProperty(RocketMQConfig.ACCESS_KEY, accessKey);
-        consumerProps.setProperty(RocketMQConfig.SECRET_KEY, secretKey);
-        return consumerProps;
-    }
+	private final long consumerOffsetTimestamp;
 
-    private void setStartupMode(
-            RocketMQSourceFunction<RowData> rocketMQSource,
-            StartupMode startMode,
-            OffsetResetStrategy offsetResetStrategy,
-            Map<MessageQueue, Long> specificOffsets,
-            long consumerOffsetTimestamp) {
-        switch (startMode) {
-            case LATEST:
-                rocketMQSource.setStartFromLatest();
-                break;
-            case EARLIEST:
-                rocketMQSource.setStartFromEarliest();
-                break;
-            case GROUP_OFFSETS:
-                rocketMQSource.setStartFromGroupOffsets(offsetResetStrategy);
-                break;
-            case SPECIFIC_OFFSETS:
-                rocketMQSource.setStartFromSpecificOffsets(specificOffsets);
-                break;
-            case TIMESTAMP:
-                rocketMQSource.setStartFromTimeStamp(consumerOffsetTimestamp);
-                break;
-            default:
-                break;
-        }
-    }
+	private List<String> metadataKeys;
 
-    // --------------------------------------------------------------------------------------------
-    // Metadata handling
-    // --------------------------------------------------------------------------------------------
+	public RocketMQScanTableSource(DescriptorProperties properties, TableSchema schema, String topic,
+			String consumerGroup, String nameServerAddress, String accessKey, String secretKey, String tag, String sql,
+			long stopInMs, boolean useNewApi, long partitionDiscoveryIntervalMs, StartupMode startMode,
+			OffsetResetStrategy offsetResetStrategy, Map<MessageQueue, Long> specificOffsets,
+			long consumerOffsetTimestamp, boolean commitOffsetAuto) {
+		this.properties = properties;
+		this.schema = schema;
+		this.topic = topic;
+		this.consumerGroup = consumerGroup;
+		this.nameServerAddress = nameServerAddress;
+		this.accessKey = accessKey;
+		this.secretKey = secretKey;
+		this.tag = tag;
+		this.sql = sql;
+		this.stopInMs = stopInMs;
+		this.partitionDiscoveryIntervalMs = partitionDiscoveryIntervalMs;
+		this.useNewApi = useNewApi;
+		this.metadataKeys = Collections.emptyList();
+		this.startMode = startMode;
+		this.offsetResetStrategy = offsetResetStrategy;
+		this.specificOffsets = specificOffsets;
+		this.consumerOffsetTimestamp = consumerOffsetTimestamp;
+		this.commitOffsetAuto = commitOffsetAuto;
+	}
 
-    enum ReadableMetadata {
-        TOPIC(
-                "topic",
-                DataTypes.STRING().notNull(),
-                new MetadataConverter() {
-                    private static final long serialVersionUID = 1L;
+	@Override
+	public ChangelogMode getChangelogMode() {
+		return ChangelogMode.insertOnly();
+	}
 
-                    @Override
-                    public Object read(BytesMessage message) {
-                        return StringData.fromString(
-                                String.valueOf(message.getProperty("__topic__")));
-                    }
-                });
+	@Override
+	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
+		if (useNewApi) {
+			return SourceProvider.of(new RocketMQSource<>(topic, consumerGroup, nameServerAddress, accessKey, secretKey,
+					tag, sql, stopInMs, partitionDiscoveryIntervalMs, isBounded() ? BOUNDED : CONTINUOUS_UNBOUNDED,
+					createRocketMQDeserializationSchema(), startMode, offsetResetStrategy, specificOffsets,
+					consumerOffsetTimestamp, commitOffsetAuto));
+		}
+		else {
+			RocketMQSourceFunction<RowData> rocketMQSource = new RocketMQSourceFunction<>(
+					createKeyValueDeserializationSchema(), getConsumerProps());
+			setStartupMode(rocketMQSource, startMode, offsetResetStrategy, specificOffsets, consumerOffsetTimestamp);
+			return SourceFunctionProvider.of(rocketMQSource, isBounded());
+		}
+	}
 
-        final String key;
+	@Override
+	public Map<String, DataType> listReadableMetadata() {
+		final Map<String, DataType> metadataMap = new LinkedHashMap<>();
+		Stream.of(ReadableMetadata.values()).forEachOrdered(m -> metadataMap.putIfAbsent(m.key, m.dataType));
+		return metadataMap;
+	}
 
-        final DataType dataType;
+	@Override
+	public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+		this.metadataKeys = metadataKeys;
+	}
 
-        final MetadataConverter converter;
+	@Override
+	public DynamicTableSource copy() {
+		RocketMQScanTableSource tableSource = new RocketMQScanTableSource(properties, schema, topic, consumerGroup,
+				nameServerAddress, accessKey, secretKey, tag, sql, stopInMs, useNewApi, partitionDiscoveryIntervalMs,
+				startMode, offsetResetStrategy, specificOffsets, consumerOffsetTimestamp, commitOffsetAuto);
+		tableSource.metadataKeys = metadataKeys;
+		return tableSource;
+	}
 
-        ReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
-            this.key = key;
-            this.dataType = dataType;
-            this.converter = converter;
-        }
-    }
+	@Override
+	public String asSummaryString() {
+		return RocketMQScanTableSource.class.getName();
+	}
+
+	private RocketMQDeserializationSchema<RowData> createRocketMQDeserializationSchema() {
+		final MetadataConverter[] metadataConverters = metadataKeys.stream()
+			.map(k -> Stream.of(ReadableMetadata.values())
+				.filter(rm -> rm.key.equals(k))
+				.findFirst()
+				.orElseThrow(IllegalStateException::new))
+			.map(m -> m.converter)
+			.toArray(MetadataConverter[]::new);
+		return new RocketMQRowDeserializationSchema(schema, properties.asMap(), metadataKeys.size() > 0,
+				metadataConverters);
+	}
+
+	private boolean isBounded() {
+		return stopInMs != Long.MAX_VALUE;
+	}
+
+	private KeyValueDeserializationSchema<RowData> createKeyValueDeserializationSchema() {
+		return new RowKeyValueDeserializationSchema.Builder().setProperties(properties.asMap())
+			.setTableSchema(schema)
+			.build();
+	}
+
+	private Properties getConsumerProps() {
+		Properties consumerProps = new Properties();
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_TOPIC, topic);
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_GROUP, consumerGroup);
+		consumerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR, nameServerAddress);
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_TAG, tag);
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_SQL, sql);
+		consumerProps.setProperty(RocketMQConfig.ACCESS_KEY, accessKey);
+		consumerProps.setProperty(RocketMQConfig.SECRET_KEY, secretKey);
+		return consumerProps;
+	}
+
+	private void setStartupMode(RocketMQSourceFunction<RowData> rocketMQSource, StartupMode startMode,
+			OffsetResetStrategy offsetResetStrategy, Map<MessageQueue, Long> specificOffsets,
+			long consumerOffsetTimestamp) {
+		switch (startMode) {
+			case LATEST:
+				rocketMQSource.setStartFromLatest();
+				break;
+			case EARLIEST:
+				rocketMQSource.setStartFromEarliest();
+				break;
+			case GROUP_OFFSETS:
+				rocketMQSource.setStartFromGroupOffsets(offsetResetStrategy);
+				break;
+			case SPECIFIC_OFFSETS:
+				rocketMQSource.setStartFromSpecificOffsets(specificOffsets);
+				break;
+			case TIMESTAMP:
+				rocketMQSource.setStartFromTimeStamp(consumerOffsetTimestamp);
+				break;
+			default:
+				break;
+		}
+	}
+
+	// --------------------------------------------------------------------------------------------
+	// Metadata handling
+	// --------------------------------------------------------------------------------------------
+
+	enum ReadableMetadata {
+
+		TOPIC("topic", DataTypes.STRING().notNull(), new MetadataConverter() {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Object read(BytesMessage message) {
+				return StringData.fromString(String.valueOf(message.getProperty("__topic__")));
+			}
+		});
+
+		final String key;
+
+		final DataType dataType;
+
+		final MetadataConverter converter;
+
+		ReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
+			this.key = key;
+			this.dataType = dataType;
+			this.converter = converter;
+		}
+
+	}
+
 }

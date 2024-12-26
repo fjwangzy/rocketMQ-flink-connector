@@ -32,36 +32,33 @@ import static org.junit.Assert.assertNotNull;
 
 public class RocketMQCatalogFactoryTest {
 
-    @Test
-    public void testCreateCatalog() {
-        RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
-        FactoryUtil.DefaultCatalogContext context =
-                new FactoryUtil.DefaultCatalogContext(
-                        "rocketmq-catalog",
-                        new HashMap<>(),
-                        null,
-                        this.getClass().getClassLoader());
-        Catalog catalog = factory.createCatalog(context);
-        assertNotNull(catalog);
-    }
+	@Test
+	public void testCreateCatalog() {
+		RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
+		FactoryUtil.DefaultCatalogContext context = new FactoryUtil.DefaultCatalogContext("rocketmq-catalog",
+				new HashMap<>(), null, this.getClass().getClassLoader());
+		Catalog catalog = factory.createCatalog(context);
+		assertNotNull(catalog);
+	}
 
-    @Test
-    public void testFactoryIdentifier() {
-        RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
-        assertEquals(factory.factoryIdentifier(), "rocketmq_catalog");
-    }
+	@Test
+	public void testFactoryIdentifier() {
+		RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
+		assertEquals(factory.factoryIdentifier(), "rocketmq_catalog");
+	}
 
-    @Test
-    public void testRequiredOptions() {
-        RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
-        Set<ConfigOption<?>> options = factory.requiredOptions();
-        assertNotNull(options);
-    }
+	@Test
+	public void testRequiredOptions() {
+		RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
+		Set<ConfigOption<?>> options = factory.requiredOptions();
+		assertNotNull(options);
+	}
 
-    @Test
-    public void testOptionalOptions() {
-        RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
-        Set<ConfigOption<?>> options = factory.optionalOptions();
-        assertEquals(options.size(), 3);
-    }
+	@Test
+	public void testOptionalOptions() {
+		RocketMQCatalogFactory factory = new RocketMQCatalogFactory();
+		Set<ConfigOption<?>> options = factory.optionalOptions();
+		assertEquals(options.size(), 3);
+	}
+
 }

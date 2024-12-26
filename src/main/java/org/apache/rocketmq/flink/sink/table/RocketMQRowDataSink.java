@@ -22,40 +22,45 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.table.data.RowData;
 
-/** RocketMQRowDataSink helps for writing the converted row data of table to RocketMQ messages. */
+/**
+ * RocketMQRowDataSink helps for writing the converted row data of table to RocketMQ
+ * messages.
+ */
 public class RocketMQRowDataSink extends RichSinkFunction<RowData> {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final RocketMQSink sink;
-    private final RocketMQRowDataConverter converter;
+	private final RocketMQSink sink;
 
-    public RocketMQRowDataSink(RocketMQSink sink, RocketMQRowDataConverter converter) {
-        this.sink = sink;
-        this.converter = converter;
-    }
+	private final RocketMQRowDataConverter converter;
 
-    @Override
-    public void open(Configuration configuration) throws Exception {
-        sink.open(configuration);
-        converter.open();
-    }
+	public RocketMQRowDataSink(RocketMQSink sink, RocketMQRowDataConverter converter) {
+		this.sink = sink;
+		this.converter = converter;
+	}
 
-    @Override
-    public void setRuntimeContext(RuntimeContext runtimeContext) {
-        sink.setRuntimeContext(runtimeContext);
-    }
+	@Override
+	public void open(Configuration configuration) throws Exception {
+		sink.open(configuration);
+		converter.open();
+	}
 
-    @Override
-    public void invoke(RowData rowData, Context context) throws Exception {
-        Message message = converter.convert(rowData);
-        if (message != null) {
-            sink.invoke(message, context);
-        }
-    }
+	@Override
+	public void setRuntimeContext(RuntimeContext runtimeContext) {
+		sink.setRuntimeContext(runtimeContext);
+	}
 
-    @Override
-    public void close() {
-        sink.close();
-    }
+	@Override
+	public void invoke(RowData rowData, Context context) throws Exception {
+		Message message = converter.convert(rowData);
+		if (message != null) {
+			sink.invoke(message, context);
+		}
+	}
+
+	@Override
+	public void close() {
+		sink.close();
+	}
+
 }

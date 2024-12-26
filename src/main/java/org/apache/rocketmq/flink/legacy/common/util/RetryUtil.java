@@ -24,45 +24,53 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.Callable;
 
 public class RetryUtil {
-    private static final Logger log = LoggerFactory.getLogger(RetryUtil.class);
 
-    private static final long INITIAL_BACKOFF = 200;
-    private static final long MAX_BACKOFF = 5000;
-    private static final int MAX_ATTEMPTS = 5;
+	private static final Logger log = LoggerFactory.getLogger(RetryUtil.class);
 
-    private RetryUtil() {}
+	private static final long INITIAL_BACKOFF = 200;
 
-    public static void waitForMs(long sleepMs) {
-        try {
-            Thread.sleep(sleepMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
+	private static final long MAX_BACKOFF = 5000;
 
-    public static <T> T call(Callable<T> callable, String errorMsg) throws RuntimeException {
-        return call(callable, errorMsg, null);
-    }
+	private static final int MAX_ATTEMPTS = 5;
 
-    public static <T> T call(Callable<T> callable, String errorMsg, RunningChecker runningChecker)
-            throws RuntimeException {
-        long backoff = INITIAL_BACKOFF;
-        int retries = 0;
-        do {
-            try {
-                return callable.call();
-            } catch (Exception ex) {
-                if (retries >= MAX_ATTEMPTS) {
-                    if (null != runningChecker) {
-                        runningChecker.setState(RunningChecker.State.FAILED);
-                    }
-                    throw new RuntimeException(ex);
-                }
-                log.error("{}, retry {}/{}", errorMsg, retries, MAX_ATTEMPTS, ex);
-                retries++;
-            }
-            waitForMs(backoff);
-            backoff = Math.min(backoff * 2, MAX_BACKOFF);
-        } while (true);
-    }
+	private RetryUtil() {
+	}
+
+	public static void waitForMs(long sleepMs) {
+		try {
+			Thread.sleep(sleepMs);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	public static <T> T call(Callable<T> callable, String errorMsg) throws RuntimeException {
+		return call(callable, errorMsg, null);
+	}
+
+	public static <T> T call(Callable<T> callable, String errorMsg, RunningChecker runningChecker)
+			throws RuntimeException {
+		long backoff = INITIAL_BACKOFF;
+		int retries = 0;
+		do {
+			try {
+				return callable.call();
+			}
+			catch (Exception ex) {
+				if (retries >= MAX_ATTEMPTS) {
+					if (null != runningChecker) {
+						runningChecker.setState(RunningChecker.State.FAILED);
+					}
+					throw new RuntimeException(ex);
+				}
+				log.error("{}, retry {}/{}", errorMsg, retries, MAX_ATTEMPTS, ex);
+				retries++;
+			}
+			waitForMs(backoff);
+			backoff = Math.min(backoff * 2, MAX_BACKOFF);
+		}
+		while (true);
+	}
+
 }

@@ -44,98 +44,83 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /** The source reader for RocketMQ partitions. */
-public class RocketMQSourceReader<T>
-        extends SingleThreadMultiplexSourceReaderBase<
-                Tuple3<T, Long, Long>, T, RocketMQPartitionSplit, RocketMQPartitionSplitState> {
+public class RocketMQSourceReader<T> extends
+		SingleThreadMultiplexSourceReaderBase<Tuple3<T, Long, Long>, T, RocketMQPartitionSplit, RocketMQPartitionSplitState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RocketMQSourceReader.class);
-    // These maps need to be concurrent because it will be accessed by both the main thread
-    // and the split fetcher thread in the callback.
-    private final SortedMap<Long, Map<MessageQueue, Long>> offsetsToCommit;
-    private final ConcurrentMap<MessageQueue, Long> offsetsOfFinishedSplits;
+	private static final Logger LOG = LoggerFactory.getLogger(RocketMQSourceReader.class);
 
-    public RocketMQSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple3<T, Long, Long>>> elementsQueue,
-            RocketMQSourceFetcherManager rocketMQSourceFetcherManager,
-            RecordEmitter<Tuple3<T, Long, Long>, T, RocketMQPartitionSplitState> recordEmitter,
-            Configuration config,
-            SourceReaderContext context) {
-        super(elementsQueue, rocketMQSourceFetcherManager, recordEmitter, config, context);
-        this.offsetsToCommit = Collections.synchronizedSortedMap(new TreeMap<>());
-        this.offsetsOfFinishedSplits = new ConcurrentHashMap<>();
-    }
+	// These maps need to be concurrent because it will be accessed by both the main
+	// thread
+	// and the split fetcher thread in the callback.
+	private final SortedMap<Long, Map<MessageQueue, Long>> offsetsToCommit;
 
-    @Override
-    protected void onSplitFinished(Map<String, RocketMQPartitionSplitState> map) {
-        map.forEach(
-                (ignored, splitState) -> {
-                    if (splitState.getCurrentOffset() >= 0) {
-                        offsetsOfFinishedSplits.put(
-                                new MessageQueue(
-                                        splitState.getTopic(),
-                                        splitState.getBroker(),
-                                        splitState.getPartition()),
-                                splitState.getCurrentOffset());
-                    }
-                });
-    }
+	private final ConcurrentMap<MessageQueue, Long> offsetsOfFinishedSplits;
 
-    @Override
-    protected RocketMQPartitionSplitState initializedState(RocketMQPartitionSplit partitionSplit) {
-        return new RocketMQPartitionSplitState(partitionSplit);
-    }
+	public RocketMQSourceReader(FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple3<T, Long, Long>>> elementsQueue,
+			RocketMQSourceFetcherManager rocketMQSourceFetcherManager,
+			RecordEmitter<Tuple3<T, Long, Long>, T, RocketMQPartitionSplitState> recordEmitter, Configuration config,
+			SourceReaderContext context) {
+		super(elementsQueue, rocketMQSourceFetcherManager, recordEmitter, config, context);
+		this.offsetsToCommit = Collections.synchronizedSortedMap(new TreeMap<>());
+		this.offsetsOfFinishedSplits = new ConcurrentHashMap<>();
+	}
 
-    @Override
-    protected RocketMQPartitionSplit toSplitType(
-            String splitId, RocketMQPartitionSplitState splitState) {
-        return splitState.toRocketMQPartitionSplit();
-    }
+	@Override
+	protected void onSplitFinished(Map<String, RocketMQPartitionSplitState> map) {
+		map.forEach((ignored, splitState) -> {
+			if (splitState.getCurrentOffset() >= 0) {
+				offsetsOfFinishedSplits.put(
+						new MessageQueue(splitState.getTopic(), splitState.getBroker(), splitState.getPartition()),
+						splitState.getCurrentOffset());
+			}
+		});
+	}
 
-    @Override
-    public List<RocketMQPartitionSplit> snapshotState(long checkpointId) {
-        List<RocketMQPartitionSplit> splits = super.snapshotState(checkpointId);
+	@Override
+	protected RocketMQPartitionSplitState initializedState(RocketMQPartitionSplit partitionSplit) {
+		return new RocketMQPartitionSplitState(partitionSplit);
+	}
 
-        if (splits.isEmpty() && offsetsOfFinishedSplits.isEmpty()) {
-            offsetsToCommit.put(checkpointId, Collections.emptyMap());
-        } else {
-            Map<MessageQueue, Long> offsetMap =
-                    offsetsToCommit.computeIfAbsent(checkpointId, id -> new HashMap<>());
-            for (RocketMQPartitionSplit split : splits) {
-                if (split.getStartingOffset() >= 0) {
-                    offsetMap.put(
-                            new MessageQueue(
-                                    split.getTopic(), split.getBroker(), split.getPartition()),
-                            split.getStartingOffset());
-                }
-            }
-            // Put offsets of all the finished splits.
-            offsetMap.putAll(offsetsOfFinishedSplits);
-        }
-        return splits;
-    }
+	@Override
+	protected RocketMQPartitionSplit toSplitType(String splitId, RocketMQPartitionSplitState splitState) {
+		return splitState.toRocketMQPartitionSplit();
+	}
 
-    @Override
-    public void notifyCheckpointComplete(long checkpointId) {
-        LOG.debug("Committing offsets for checkpoint {}", checkpointId);
-        Map<MessageQueue, Long> committedOffsets = offsetsToCommit.get(checkpointId);
-        if (committedOffsets == null || committedOffsets.isEmpty()) {
-            LOG.debug(
-                    "Offsets for checkpoint {} either do not exist or have already been committed.",
-                    checkpointId);
-            return;
-        }
-        ((RocketMQSourceFetcherManager<T>) splitFetcherManager)
-                .commitOffsets(
-                        committedOffsets,
-                        () -> {
-                            offsetsOfFinishedSplits
-                                    .entrySet()
-                                    .removeIf(
-                                            entry -> committedOffsets.containsKey(entry.getKey()));
-                            while (!offsetsToCommit.isEmpty()
-                                    && offsetsToCommit.firstKey() <= checkpointId) {
-                                offsetsToCommit.remove(offsetsToCommit.firstKey());
-                            }
-                        });
-    }
+	@Override
+	public List<RocketMQPartitionSplit> snapshotState(long checkpointId) {
+		List<RocketMQPartitionSplit> splits = super.snapshotState(checkpointId);
+
+		if (splits.isEmpty() && offsetsOfFinishedSplits.isEmpty()) {
+			offsetsToCommit.put(checkpointId, Collections.emptyMap());
+		}
+		else {
+			Map<MessageQueue, Long> offsetMap = offsetsToCommit.computeIfAbsent(checkpointId, id -> new HashMap<>());
+			for (RocketMQPartitionSplit split : splits) {
+				if (split.getStartingOffset() >= 0) {
+					offsetMap.put(new MessageQueue(split.getTopic(), split.getBroker(), split.getPartition()),
+							split.getStartingOffset());
+				}
+			}
+			// Put offsets of all the finished splits.
+			offsetMap.putAll(offsetsOfFinishedSplits);
+		}
+		return splits;
+	}
+
+	@Override
+	public void notifyCheckpointComplete(long checkpointId) {
+		LOG.debug("Committing offsets for checkpoint {}", checkpointId);
+		Map<MessageQueue, Long> committedOffsets = offsetsToCommit.get(checkpointId);
+		if (committedOffsets == null || committedOffsets.isEmpty()) {
+			LOG.debug("Offsets for checkpoint {} either do not exist or have already been committed.", checkpointId);
+			return;
+		}
+		((RocketMQSourceFetcherManager<T>) splitFetcherManager).commitOffsets(committedOffsets, () -> {
+			offsetsOfFinishedSplits.entrySet().removeIf(entry -> committedOffsets.containsKey(entry.getKey()));
+			while (!offsetsToCommit.isEmpty() && offsetsToCommit.firstKey() <= checkpointId) {
+				offsetsToCommit.remove(offsetsToCommit.firstKey());
+			}
+		});
+	}
+
 }

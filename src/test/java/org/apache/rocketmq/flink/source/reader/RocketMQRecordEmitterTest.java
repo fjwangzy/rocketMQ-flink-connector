@@ -38,63 +38,59 @@ import static org.junit.Assert.assertEquals;
 /** Test for {@link RocketMQRecordEmitter}. */
 public class RocketMQRecordEmitterTest {
 
-    @Test
-    public void testEmitRecord() {
-        RocketMQRecordEmitter<RowData> recordEmitter = new RocketMQRecordEmitter<>();
-        MessageExt message =
-                new MessageExt(
-                        1,
-                        System.currentTimeMillis(),
-                        InetSocketAddress.createUnresolved("localhost", 8080),
-                        System.currentTimeMillis(),
-                        InetSocketAddress.createUnresolved("localhost", 8088),
-                        "184019387");
-        message.setBody("test_emit_record_message".getBytes());
-        GenericRowData rowData = new GenericRowData(1);
-        rowData.setField(0, message.getBody());
-        String topic = "test-record-emitter";
-        String broker = "taobaodaily";
-        int partition = 256;
-        long startingOffset = 100;
-        long stoppingTimestamp = System.currentTimeMillis();
-        Tuple3<RowData, Long, Long> record =
-                new Tuple3<>(rowData, 100L, System.currentTimeMillis());
-        RocketMQPartitionSplitState partitionSplitState =
-                new RocketMQPartitionSplitState(
-                        new RocketMQPartitionSplit(
-                                topic, broker, partition, startingOffset, stoppingTimestamp));
-        recordEmitter.emitRecord(record, new TestingEmitterOutput<>(), partitionSplitState);
-        assertEquals(
-                new RocketMQPartitionSplit(
-                        topic, broker, partition, startingOffset + 1, stoppingTimestamp),
-                partitionSplitState.toRocketMQPartitionSplit());
-    }
+	@Test
+	public void testEmitRecord() {
+		RocketMQRecordEmitter<RowData> recordEmitter = new RocketMQRecordEmitter<>();
+		MessageExt message = new MessageExt(1, System.currentTimeMillis(),
+				InetSocketAddress.createUnresolved("localhost", 8080), System.currentTimeMillis(),
+				InetSocketAddress.createUnresolved("localhost", 8088), "184019387");
+		message.setBody("test_emit_record_message".getBytes());
+		GenericRowData rowData = new GenericRowData(1);
+		rowData.setField(0, message.getBody());
+		String topic = "test-record-emitter";
+		String broker = "taobaodaily";
+		int partition = 256;
+		long startingOffset = 100;
+		long stoppingTimestamp = System.currentTimeMillis();
+		Tuple3<RowData, Long, Long> record = new Tuple3<>(rowData, 100L, System.currentTimeMillis());
+		RocketMQPartitionSplitState partitionSplitState = new RocketMQPartitionSplitState(
+				new RocketMQPartitionSplit(topic, broker, partition, startingOffset, stoppingTimestamp));
+		recordEmitter.emitRecord(record, new TestingEmitterOutput<>(), partitionSplitState);
+		assertEquals(new RocketMQPartitionSplit(topic, broker, partition, startingOffset + 1, stoppingTimestamp),
+				partitionSplitState.toRocketMQPartitionSplit());
+	}
 
-    private static final class TestingEmitterOutput<E> implements ReaderOutput<E> {
+	private static final class TestingEmitterOutput<E> implements ReaderOutput<E> {
 
-        private TestingEmitterOutput() {}
+		private TestingEmitterOutput() {
+		}
 
-        public void collect(E record) {}
+		public void collect(E record) {
+		}
 
-        public void collect(E record, long timestamp) {
-            this.collect(record);
-        }
+		public void collect(E record, long timestamp) {
+			this.collect(record);
+		}
 
-        public void emitWatermark(Watermark watermark) {
-            throw new UnsupportedOperationException();
-        }
+		public void emitWatermark(Watermark watermark) {
+			throw new UnsupportedOperationException();
+		}
 
-        public void markIdle() {
-            throw new UnsupportedOperationException();
-        }
+		public void markIdle() {
+			throw new UnsupportedOperationException();
+		}
 
-        @Override
-        public void markActive() {}
+		@Override
+		public void markActive() {
+		}
 
-        public SourceOutput<E> createOutputForSplit(String splitId) {
-            return this;
-        }
+		public SourceOutput<E> createOutputForSplit(String splitId) {
+			return this;
+		}
 
-        public void releaseOutputForSplit(String splitId) {}
-    }
+		public void releaseOutputForSplit(String splitId) {
+		}
+
+	}
+
 }

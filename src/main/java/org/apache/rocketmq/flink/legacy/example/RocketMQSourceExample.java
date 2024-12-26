@@ -26,31 +26,31 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 public class RocketMQSourceExample {
-    private static String topic = "tp_test";
-    private static String consumerGroup = "cg_test";
-    private static String nameServerAddress = "10.13.66.140:9876";
 
-    public static void main(String[] args) throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(30000L);
+	private static String topic = "tp_test";
 
-        RocketMQSource<String> source =
-                RocketMQSource.<String>builder()
-                        .setNameServerAddress(nameServerAddress)
-                        .setTopic(topic)
-                        .setConsumerGroup(consumerGroup)
-                        .setStartFromEarliest()
-                        .setDeserializer(
-                                new RocketMQValueOnlyDeserializationSchemaWrapper<>(
-                                        new SimpleStringSchema()))
-                        .build();
+	private static String consumerGroup = "cg_test";
 
-        DataStreamSource<String> newSource =
-                env.fromSource(source, WatermarkStrategy.noWatermarks(), "new source")
-                        .setParallelism(4);
+	private static String nameServerAddress = "10.13.66.140:9876";
 
-        newSource.print().setParallelism(1);
+	public static void main(String[] args) throws Exception {
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		env.enableCheckpointing(30000L);
 
-        env.execute();
-    }
+		RocketMQSource<String> source = RocketMQSource.<String>builder()
+			.setNameServerAddress(nameServerAddress)
+			.setTopic(topic)
+			.setConsumerGroup(consumerGroup)
+			.setStartFromEarliest()
+			.setDeserializer(new RocketMQValueOnlyDeserializationSchemaWrapper<>(new SimpleStringSchema()))
+			.build();
+
+		DataStreamSource<String> newSource = env.fromSource(source, WatermarkStrategy.noWatermarks(), "new source")
+			.setParallelism(4);
+
+		newSource.print().setParallelism(1);
+
+		env.execute();
+	}
+
 }

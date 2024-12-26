@@ -24,30 +24,32 @@ import java.util.Map;
 /** Message contains byte array. */
 public class BytesMessage {
 
-    private byte[] data;
-    private Map<String, String> properties = new HashMap<>();
+	private byte[] data;
 
-    public byte[] getData() {
-        return data;
-    }
+	private Map<String, String> properties = new HashMap<>();
 
-    public void setData(byte[] data) {
-        this.data = data;
-    }
+	public byte[] getData() {
+		return data;
+	}
 
-    public Map<String, String> getProperties() {
-        return properties;
-    }
+	public void setData(byte[] data) {
+		this.data = data;
+	}
 
-    public void setProperties(Map<String, String> props) {
-        this.properties = props;
-    }
+	public Map<String, String> getProperties() {
+		return properties;
+	}
 
-    public Object getProperty(String key) {
-        return properties.get(key);
-    }
+	public void setProperties(Map<String, String> props) {
+		this.properties = props;
+	}
 
-    public void setProperty(String key, String value) {
-        properties.put(key, value);
-    }
+	public Object getProperty(String key) {
+		return properties.get(key);
+	}
+
+	public void setProperty(String key, String value) {
+		properties.put(key, value);
+	}
+
 }

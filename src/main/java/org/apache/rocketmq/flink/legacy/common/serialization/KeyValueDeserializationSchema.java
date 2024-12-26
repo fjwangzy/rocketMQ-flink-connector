@@ -21,5 +21,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import java.io.Serializable;
 
 public interface KeyValueDeserializationSchema<T> extends ResultTypeQueryable<T>, Serializable {
-    T deserializeKeyAndValue(byte[] key, byte[] value);
+
+	T deserializeKeyAndValue(byte[] key, byte[] value);
+
 }

@@ -35,120 +35,110 @@ import java.util.Set;
 /** String serializer. */
 public class StringSerializer {
 
-    public static TimestampConverter timestampConverter = new TimestampConverter(3);
-    private static final Base64.Decoder DECODER = Base64.getDecoder();
+	public static TimestampConverter timestampConverter = new TimestampConverter(3);
 
-    public static Object deserialize(
-            String value,
-            ByteSerializer.ValueType type,
-            DataType dataType,
-            Set<String> nullValues) {
-        return deserialize(value, type, dataType, nullValues, false);
-    }
+	private static final Base64.Decoder DECODER = Base64.getDecoder();
 
-    public static Object deserialize(
-            String value,
-            ByteSerializer.ValueType type,
-            DataType dataType,
-            Set<String> nullValues,
-            Boolean isRGData) {
-        if (null != nullValues && nullValues.contains(value)) {
-            return null;
-        }
-        switch (type) {
-            case V_ByteArray: // byte[]
-                if (isRGData) {
-                    byte[] bytes = null;
-                    try {
-                        bytes = DECODER.decode(value);
-                    } catch (Exception e) {
-                        //
-                    }
-                    return bytes;
-                } else {
-                    return value.getBytes();
-                }
-            case V_String:
-                return BinaryStringData.fromString(value);
-            case V_Byte: // byte
-                return null == value ? null : Byte.parseByte(value);
-            case V_Short:
-                return null == value ? null : Short.parseShort(value);
-            case V_Integer:
-                return null == value ? null : Integer.parseInt(value);
-            case V_Long:
-                return null == value ? null : Long.parseLong(value);
-            case V_Float:
-                return null == value ? null : Float.parseFloat(value);
-            case V_Double:
-                return null == value ? null : Double.parseDouble(value);
-            case V_Boolean:
-                return null == value ? null : parseBoolean(value);
-            case V_Timestamp: // sql.Timestamp encoded as long
-                if (isRGData) {
-                    return null == value ? null : Long.parseLong(value);
-                }
-                if (null == value) {
-                    return null;
-                } else {
-                    try {
-                        return timestampConverter.toInternal(new Timestamp(Long.parseLong(value)));
-                    } catch (NumberFormatException e) {
-                        return timestampConverter.toInternal(Timestamp.valueOf(value));
-                    }
-                }
-            case V_Date: // sql.Date encoded as long
-                if (isRGData) {
-                    return null == value ? null : Long.parseLong(value);
-                }
-                return null == value
-                        ? null
-                        : DataFormatConverters.DateConverter.INSTANCE.toInternal(
-                                Date.valueOf(value));
-            case V_Time: // sql.Time encoded as long
-                if (isRGData) {
-                    return null == value ? null : Long.parseLong(value);
-                }
-                return null == value
-                        ? null
-                        : DataFormatConverters.TimeConverter.INSTANCE.toInternal(
-                                new Time(Long.parseLong(value)));
-            case V_BigDecimal:
-                DecimalType decimalType = (DecimalType) dataType.getLogicalType();
-                return value == null
-                        ? null
-                        : DecimalData.fromBigDecimal(
-                                new BigDecimal(value),
-                                decimalType.getPrecision(),
-                                decimalType.getScale());
-            case V_BigInteger:
-                return null == value ? null : new BigInteger(value);
+	public static Object deserialize(String value, ByteSerializer.ValueType type, DataType dataType,
+			Set<String> nullValues) {
+		return deserialize(value, type, dataType, nullValues, false);
+	}
 
-            default:
-                throw new IllegalArgumentException();
-        }
-    }
+	public static Object deserialize(String value, ByteSerializer.ValueType type, DataType dataType,
+			Set<String> nullValues, Boolean isRGData) {
+		if (null != nullValues && nullValues.contains(value)) {
+			return null;
+		}
+		switch (type) {
+			case V_ByteArray: // byte[]
+				if (isRGData) {
+					byte[] bytes = null;
+					try {
+						bytes = DECODER.decode(value);
+					}
+					catch (Exception e) {
+						//
+					}
+					return bytes;
+				}
+				else {
+					return value.getBytes();
+				}
+			case V_String:
+				return BinaryStringData.fromString(value);
+			case V_Byte: // byte
+				return null == value ? null : Byte.parseByte(value);
+			case V_Short:
+				return null == value ? null : Short.parseShort(value);
+			case V_Integer:
+				return null == value ? null : Integer.parseInt(value);
+			case V_Long:
+				return null == value ? null : Long.parseLong(value);
+			case V_Float:
+				return null == value ? null : Float.parseFloat(value);
+			case V_Double:
+				return null == value ? null : Double.parseDouble(value);
+			case V_Boolean:
+				return null == value ? null : parseBoolean(value);
+			case V_Timestamp: // sql.Timestamp encoded as long
+				if (isRGData) {
+					return null == value ? null : Long.parseLong(value);
+				}
+				if (null == value) {
+					return null;
+				}
+				else {
+					try {
+						return timestampConverter.toInternal(new Timestamp(Long.parseLong(value)));
+					}
+					catch (NumberFormatException e) {
+						return timestampConverter.toInternal(Timestamp.valueOf(value));
+					}
+				}
+			case V_Date: // sql.Date encoded as long
+				if (isRGData) {
+					return null == value ? null : Long.parseLong(value);
+				}
+				return null == value ? null
+						: DataFormatConverters.DateConverter.INSTANCE.toInternal(Date.valueOf(value));
+			case V_Time: // sql.Time encoded as long
+				if (isRGData) {
+					return null == value ? null : Long.parseLong(value);
+				}
+				return null == value ? null
+						: DataFormatConverters.TimeConverter.INSTANCE.toInternal(new Time(Long.parseLong(value)));
+			case V_BigDecimal:
+				DecimalType decimalType = (DecimalType) dataType.getLogicalType();
+				return value == null ? null : DecimalData.fromBigDecimal(new BigDecimal(value),
+						decimalType.getPrecision(), decimalType.getScale());
+			case V_BigInteger:
+				return null == value ? null : new BigInteger(value);
 
-    public static Object deserialize(
-            String value, ByteSerializer.ValueType type, DataType dataType, Boolean isRGData) {
-        return deserialize(value, type, dataType, null, isRGData);
-    }
+			default:
+				throw new IllegalArgumentException();
+		}
+	}
 
-    public static Boolean parseBoolean(String s) {
-        if (s != null) {
-            if (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")) {
-                return Boolean.valueOf(s);
-            }
+	public static Object deserialize(String value, ByteSerializer.ValueType type, DataType dataType, Boolean isRGData) {
+		return deserialize(value, type, dataType, null, isRGData);
+	}
 
-            if (s.equals("1")) {
-                return Boolean.TRUE;
-            }
+	public static Boolean parseBoolean(String s) {
+		if (s != null) {
+			if (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")) {
+				return Boolean.valueOf(s);
+			}
 
-            if (s.equals("0")) {
-                return Boolean.FALSE;
-            }
-        }
+			if (s.equals("1")) {
+				return Boolean.TRUE;
+			}
 
-        throw new IllegalArgumentException();
-    }
+			if (s.equals("0")) {
+				return Boolean.FALSE;
+			}
+		}
+
+		throw new IllegalArgumentException();
+	}
+
 }

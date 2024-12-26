@@ -27,24 +27,25 @@ import org.apache.commons.lang.Validate;
 
 public class SinkMapFunction extends ProcessFunction<Tuple2<String, String>, Message> {
 
-    private String topic;
+	private String topic;
 
-    private String tag;
+	private String tag;
 
-    public SinkMapFunction() {}
+	public SinkMapFunction() {
+	}
 
-    public SinkMapFunction(String topic, String tag) {
-        this.topic = topic;
-        this.tag = tag;
-    }
+	public SinkMapFunction(String topic, String tag) {
+		this.topic = topic;
+		this.tag = tag;
+	}
 
-    @Override
-    public void processElement(Tuple2<String, String> tuple, Context ctx, Collector<Message> out)
-            throws Exception {
-        Validate.notNull(topic, "the message topic is null");
-        Validate.notNull(tuple.f1.getBytes(), "the message body is null");
+	@Override
+	public void processElement(Tuple2<String, String> tuple, Context ctx, Collector<Message> out) throws Exception {
+		Validate.notNull(topic, "the message topic is null");
+		Validate.notNull(tuple.f1.getBytes(), "the message body is null");
 
-        Message message = new Message(topic, tag, tuple.f0, tuple.f1.getBytes());
-        out.collect(message);
-    }
+		Message message = new Message(topic, tag, tuple.f0, tuple.f1.getBytes());
+		out.collect(message);
+	}
+
 }

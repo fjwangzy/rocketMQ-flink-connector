@@ -22,32 +22,26 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 public class RocketMQSqlExample {
-    private static String topic = "tp_test";
-    private static String consumerGroup = "cg_test";
-    private static String nameServerAddress = "10.13.66.140:9876";
 
-    public static void main(String[] args) throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
-        String sqlCreate =
-                String.format(
-                        "CREATE TABLE rocketmq_source (\n"
-                                + "  `user_id` BIGINT,\n"
-                                + "  `behavior` STRING\n"
-                                + ") WITH (\n"
-                                + "  'connector' = 'rocketmq',\n"
-                                + "  'topic' = '%s',\n"
-                                + "  'consumerGroup' = '%s',\n"
-                                + "  'nameServerAddress' = '%s',\n"
-                                + "  'fieldDelimiter' = ' ',\n"
-                                + "  'scan.startup.mode' = 'specific-offsets',\n"
-                                + "  'commit.offset.auto' = 'true',\n"
-                                + "  'scan.startup.specific-offsets' = 'broker:broker-a,queue:0,offset:21;broker:broker-a,queue:1,offset:14'\n"
-                                + ");",
-                        topic, consumerGroup, nameServerAddress);
-        tableEnv.executeSql(sqlCreate);
-        Table table = tableEnv.sqlQuery("select * from rocketmq_source");
-        table.execute().print();
-        env.execute();
-    }
+	private static String topic = "tp_test";
+
+	private static String consumerGroup = "cg_test";
+
+	private static String nameServerAddress = "10.13.66.140:9876";
+
+	public static void main(String[] args) throws Exception {
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
+		String sqlCreate = String.format("CREATE TABLE rocketmq_source (\n" + "  `user_id` BIGINT,\n"
+				+ "  `behavior` STRING\n" + ") WITH (\n" + "  'connector' = 'rocketmq',\n" + "  'topic' = '%s',\n"
+				+ "  'consumerGroup' = '%s',\n" + "  'nameServerAddress' = '%s',\n" + "  'fieldDelimiter' = ' ',\n"
+				+ "  'scan.startup.mode' = 'specific-offsets',\n" + "  'commit.offset.auto' = 'true',\n"
+				+ "  'scan.startup.specific-offsets' = 'broker:broker-a,queue:0,offset:21;broker:broker-a,queue:1,offset:14'\n"
+				+ ");", topic, consumerGroup, nameServerAddress);
+		tableEnv.executeSql(sqlCreate);
+		Table table = tableEnv.sqlQuery("select * from rocketmq_source");
+		table.execute().print();
+		env.execute();
+	}
+
 }

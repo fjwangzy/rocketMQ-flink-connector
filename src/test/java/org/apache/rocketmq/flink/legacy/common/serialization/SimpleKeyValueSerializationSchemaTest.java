@@ -26,21 +26,19 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 
 public class SimpleKeyValueSerializationSchemaTest {
-    @Test
-    public void serializeKeyAndValue() throws Exception {
-        SimpleKeyValueSerializationSchema serializationSchema =
-                new SimpleKeyValueSerializationSchema("id", "name");
-        SimpleKeyValueDeserializationSchema deserializationSchema =
-                new SimpleKeyValueDeserializationSchema("id", "name");
 
-        Map tuple = new HashMap();
-        tuple.put("id", "x001");
-        tuple.put("name", "vesense");
+	@Test
+	public void serializeKeyAndValue() throws Exception {
+		SimpleKeyValueSerializationSchema serializationSchema = new SimpleKeyValueSerializationSchema("id", "name");
+		SimpleKeyValueDeserializationSchema deserializationSchema = new SimpleKeyValueDeserializationSchema("id",
+				"name");
 
-        assertEquals(
-                tuple,
-                deserializationSchema.deserializeKeyAndValue(
-                        serializationSchema.serializeKey(tuple),
-                        serializationSchema.serializeValue(tuple)));
-    }
+		Map tuple = new HashMap();
+		tuple.put("id", "x001");
+		tuple.put("name", "vesense");
+
+		assertEquals(tuple, deserializationSchema.deserializeKeyAndValue(serializationSchema.serializeKey(tuple),
+				serializationSchema.serializeValue(tuple)));
+	}
+
 }

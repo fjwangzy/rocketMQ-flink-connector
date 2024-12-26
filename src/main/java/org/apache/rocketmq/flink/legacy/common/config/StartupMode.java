@@ -19,26 +19,25 @@ package org.apache.rocketmq.flink.legacy.common.config;
 
 /** RocketMQ startup mode. */
 public enum StartupMode {
-    EARLIEST("earliest-offset", "Start from the earliest offset possible."),
-    LATEST("latest-offset", "Start from the latest offset."),
-    GROUP_OFFSETS(
-            "group-offsets",
-            "Start from committed offsets in brokers of a specific consumer group."),
-    TIMESTAMP("timestamp", "Start from user-supplied timestamp for each message queue."),
-    SPECIFIC_OFFSETS(
-            "specific-offsets",
-            "Start from user-supplied specific offsets for each message queue.");
 
-    private final String value;
-    private final String description;
+	EARLIEST("earliest-offset", "Start from the earliest offset possible."),
+	LATEST("latest-offset", "Start from the latest offset."),
+	GROUP_OFFSETS("group-offsets", "Start from committed offsets in brokers of a specific consumer group."),
+	TIMESTAMP("timestamp", "Start from user-supplied timestamp for each message queue."),
+	SPECIFIC_OFFSETS("specific-offsets", "Start from user-supplied specific offsets for each message queue.");
 
-    StartupMode(String value, String description) {
-        this.value = value;
-        this.description = description;
-    }
+	private final String value;
 
-    @Override
-    public String toString() {
-        return value;
-    }
+	private final String description;
+
+	StartupMode(String value, String description) {
+		this.value = value;
+		this.description = description;
+	}
+
+	@Override
+	public String toString() {
+		return value;
+	}
+
 }

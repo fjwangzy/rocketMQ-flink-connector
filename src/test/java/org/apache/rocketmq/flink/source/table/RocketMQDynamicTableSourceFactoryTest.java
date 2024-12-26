@@ -45,82 +45,71 @@ import static org.junit.Assert.assertTrue;
 /** Tests for {@link RocketMQDynamicTableSourceFactory}. */
 public class RocketMQDynamicTableSourceFactoryTest {
 
-    private static final ResolvedSchema SCHEMA =
-            new ResolvedSchema(
-                    Collections.singletonList(Column.physical("name", STRING().notNull())),
-                    new ArrayList<>(),
-                    null);
+	private static final ResolvedSchema SCHEMA = new ResolvedSchema(
+			Collections.singletonList(Column.physical("name", STRING().notNull())), new ArrayList<>(), null);
 
-    private static final String IDENTIFIER = "rocketmq";
-    private static final String TOPIC = "test_source";
-    private static final String CONSUMER_GROUP = "test_consumer";
-    private static final String NAME_SERVER_ADDRESS = "127.0.0.1:9876";
+	private static final String IDENTIFIER = "rocketmq";
 
-    @Test
-    public void testRocketMQDynamicTableSourceWithLegalOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", IDENTIFIER);
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
-        options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
-        final DynamicTableSource tableSource = createTableSource(options);
-        assertTrue(tableSource instanceof RocketMQScanTableSource);
-        assertEquals(RocketMQScanTableSource.class.getName(), tableSource.asSummaryString());
-    }
+	private static final String TOPIC = "test_source";
 
-    @Test(expected = ValidationException.class)
-    public void testRocketMQDynamicTableSourceWithoutRequiredOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", IDENTIFIER);
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
-        options.put(RocketMQOptions.OPTIONAL_TAG.key(), "test_tag");
-        createTableSource(options);
-    }
+	private static final String CONSUMER_GROUP = "test_consumer";
 
-    @Test(expected = ValidationException.class)
-    public void testRocketMQDynamicTableSourceWithUnknownOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
-        options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
-        options.put("unknown", "test_option");
-        createTableSource(options);
-    }
+	private static final String NAME_SERVER_ADDRESS = "127.0.0.1:9876";
 
-    @Test
-    public void testRocketMQDynamicTableSourceWithSql() {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", IDENTIFIER);
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
-        options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
-        options.put(
-                RocketMQOptions.OPTIONAL_SQL.key(),
-                "(TAGS is not null and TAGS in ('TagA', 'TagB'))");
-        final DynamicTableSource tableSource = createTableSource(options);
-        assertTrue(tableSource instanceof RocketMQScanTableSource);
-        assertEquals(RocketMQScanTableSource.class.getName(), tableSource.asSummaryString());
-    }
+	@Test
+	public void testRocketMQDynamicTableSourceWithLegalOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put("connector", IDENTIFIER);
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
+		options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
+		final DynamicTableSource tableSource = createTableSource(options);
+		assertTrue(tableSource instanceof RocketMQScanTableSource);
+		assertEquals(RocketMQScanTableSource.class.getName(), tableSource.asSummaryString());
+	}
 
-    private static DynamicTableSource createTableSource(
-            Map<String, String> options, Configuration conf) {
-        return FactoryUtil.createTableSource(
-                null,
-                ObjectIdentifier.of("default", "default", IDENTIFIER),
-                new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
-                                "mock source",
-                                Collections.emptyList(),
-                                options),
-                        SCHEMA),
-                conf,
-                RocketMQDynamicTableSourceFactory.class.getClassLoader(),
-                false);
-    }
+	@Test(expected = ValidationException.class)
+	public void testRocketMQDynamicTableSourceWithoutRequiredOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put("connector", IDENTIFIER);
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
+		options.put(RocketMQOptions.OPTIONAL_TAG.key(), "test_tag");
+		createTableSource(options);
+	}
 
-    private static DynamicTableSource createTableSource(Map<String, String> options) {
-        return createTableSource(options, new Configuration());
-    }
+	@Test(expected = ValidationException.class)
+	public void testRocketMQDynamicTableSourceWithUnknownOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
+		options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
+		options.put("unknown", "test_option");
+		createTableSource(options);
+	}
+
+	@Test
+	public void testRocketMQDynamicTableSourceWithSql() {
+		final Map<String, String> options = new HashMap<>();
+		options.put("connector", IDENTIFIER);
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.CONSUMER_GROUP.key(), CONSUMER_GROUP);
+		options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
+		options.put(RocketMQOptions.OPTIONAL_SQL.key(), "(TAGS is not null and TAGS in ('TagA', 'TagB'))");
+		final DynamicTableSource tableSource = createTableSource(options);
+		assertTrue(tableSource instanceof RocketMQScanTableSource);
+		assertEquals(RocketMQScanTableSource.class.getName(), tableSource.asSummaryString());
+	}
+
+	private static DynamicTableSource createTableSource(Map<String, String> options, Configuration conf) {
+		return FactoryUtil.createTableSource(null, ObjectIdentifier.of("default", "default", IDENTIFIER),
+				new ResolvedCatalogTable(CatalogTable.of(Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
+						"mock source", Collections.emptyList(), options), SCHEMA),
+				conf, RocketMQDynamicTableSourceFactory.class.getClassLoader(), false);
+	}
+
+	private static DynamicTableSource createTableSource(Map<String, String> options) {
+		return createTableSource(options, new Configuration());
+	}
+
 }

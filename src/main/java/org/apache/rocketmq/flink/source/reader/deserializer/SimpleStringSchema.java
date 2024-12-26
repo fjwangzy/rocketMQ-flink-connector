@@ -34,54 +34,52 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** Deserialize value to string */
 public class SimpleStringSchema implements DeserializationSchema<List<MessageExt>, String> {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private String charName;
+	private String charName;
 
-    /**
-     * The charset to use to convert between strings and bytes. The field is transient because we
-     * serialize a different delegate object instead
-     */
-    private transient Charset charset;
+	/**
+	 * The charset to use to convert between strings and bytes. The field is transient
+	 * because we serialize a different delegate object instead
+	 */
+	private transient Charset charset;
 
-    /** Creates a new SimpleStringSchema that uses "UTF-8" as the encoding. */
-    public SimpleStringSchema() {
-        this(StandardCharsets.UTF_8);
-    }
+	/** Creates a new SimpleStringSchema that uses "UTF-8" as the encoding. */
+	public SimpleStringSchema() {
+		this(StandardCharsets.UTF_8);
+	}
 
-    /**
-     * Creates a new SimpleStringSchema that uses the given charset to convert between strings and
-     * bytes.
-     *
-     * @param charset The charset to use to convert between strings and bytes.
-     */
-    public SimpleStringSchema(Charset charset) {
-        this.charset = checkNotNull(charset);
-        this.charName = charset.name();
-    }
+	/**
+	 * Creates a new SimpleStringSchema that uses the given charset to convert between
+	 * strings and bytes.
+	 * @param charset The charset to use to convert between strings and bytes.
+	 */
+	public SimpleStringSchema(Charset charset) {
+		this.charset = checkNotNull(charset);
+		this.charName = charset.name();
+	}
 
-    @Override
-    public void open(
-            org.apache.flink.api.common.serialization.DeserializationSchema.InitializationContext
-                    context)
-            throws Exception {
-        DeserializationSchema.super.open(context);
-        if (charset == null) {
-            charset = Charset.forName(charName);
-        }
-    }
+	@Override
+	public void open(org.apache.flink.api.common.serialization.DeserializationSchema.InitializationContext context)
+			throws Exception {
+		DeserializationSchema.super.open(context);
+		if (charset == null) {
+			charset = Charset.forName(charName);
+		}
+	}
 
-    @Override
-    public void deserialize(List<MessageExt> record, Collector<String> out) throws IOException {
-        for (MessageExt messageExt : record) {
-            byte[] body = messageExt.getBody();
-            String value = new String(body, charset);
-            out.collect(value);
-        }
-    }
+	@Override
+	public void deserialize(List<MessageExt> record, Collector<String> out) throws IOException {
+		for (MessageExt messageExt : record) {
+			byte[] body = messageExt.getBody();
+			String value = new String(body, charset);
+			out.collect(value);
+		}
+	}
 
-    @Override
-    public TypeInformation<String> getProducedType() {
-        return BasicTypeInfo.STRING_TYPE_INFO;
-    }
+	@Override
+	public TypeInformation<String> getProducedType() {
+		return BasicTypeInfo.STRING_TYPE_INFO;
+	}
+
 }

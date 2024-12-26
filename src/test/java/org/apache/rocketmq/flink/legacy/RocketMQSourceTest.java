@@ -41,11 +41,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.rocketmq.flink.legacy.common.util.TestUtils.setFieldValue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -54,72 +50,78 @@ import static org.mockito.Mockito.when;
 @Ignore
 public class RocketMQSourceTest {
 
-    private RocketMQSourceFunction rocketMQSource;
-    private MQPullConsumerScheduleService pullConsumerScheduleService;
-    private DefaultMQPullConsumer consumer;
-    private KeyValueDeserializationSchema deserializationSchema;
-    private String topic = "tpc";
+	private RocketMQSourceFunction rocketMQSource;
 
-    @Before
-    public void setUp() throws Exception {
-        deserializationSchema = new SimpleKeyValueDeserializationSchema();
-        Properties props = new Properties();
-        rocketMQSource = new RocketMQSourceFunction(deserializationSchema, props);
+	private MQPullConsumerScheduleService pullConsumerScheduleService;
 
-        setFieldValue(rocketMQSource, "topic", topic);
-        setFieldValue(rocketMQSource, "runningChecker", new SingleRunningCheck());
-        setFieldValue(rocketMQSource, "offsetTable", new ConcurrentHashMap<>());
-        setFieldValue(rocketMQSource, "restoredOffsets", new ConcurrentHashMap<>());
+	private DefaultMQPullConsumer consumer;
 
-        pullConsumerScheduleService = new MQPullConsumerScheduleService("g");
+	private KeyValueDeserializationSchema deserializationSchema;
 
-        consumer = mock(DefaultMQPullConsumer.class);
-        pullConsumerScheduleService.setDefaultMQPullConsumer(consumer);
-        setFieldValue(rocketMQSource, "consumer", consumer);
-        setFieldValue(rocketMQSource, "pullConsumerScheduleService", pullConsumerScheduleService);
-    }
+	private String topic = "tpc";
 
-    @Test
-    public void testSource() throws Exception {
-        List<MessageExt> msgFoundList = new ArrayList<>();
-        MessageExt messageExt = new MessageExt();
-        messageExt.setKeys("keys");
-        messageExt.setBody("body data".getBytes());
-        messageExt.setBornTimestamp(System.currentTimeMillis());
-        msgFoundList.add(messageExt);
-        PullResult pullResult = new PullResult(PullStatus.FOUND, 3, 1, 5, msgFoundList);
+	@Before
+	public void setUp() throws Exception {
+		deserializationSchema = new SimpleKeyValueDeserializationSchema();
+		Properties props = new Properties();
+		rocketMQSource = new RocketMQSourceFunction(deserializationSchema, props);
 
-        when(consumer.fetchConsumeOffset(any(MessageQueue.class), anyBoolean())).thenReturn(2L);
-        when(consumer.pull(any(MessageQueue.class), anyString(), anyLong(), anyInt()))
-                .thenReturn(pullResult);
+		setFieldValue(rocketMQSource, "topic", topic);
+		setFieldValue(rocketMQSource, "runningChecker", new SingleRunningCheck());
+		setFieldValue(rocketMQSource, "offsetTable", new ConcurrentHashMap<>());
+		setFieldValue(rocketMQSource, "restoredOffsets", new ConcurrentHashMap<>());
 
-        SourceContext context = mock(SourceContext.class);
-        when(context.getCheckpointLock()).thenReturn(new Object());
+		pullConsumerScheduleService = new MQPullConsumerScheduleService("g");
 
-        rocketMQSource.run(context);
+		consumer = mock(DefaultMQPullConsumer.class);
+		pullConsumerScheduleService.setDefaultMQPullConsumer(consumer);
+		setFieldValue(rocketMQSource, "consumer", consumer);
+		setFieldValue(rocketMQSource, "pullConsumerScheduleService", pullConsumerScheduleService);
+	}
 
-        // schedule the pull task
-        Set<MessageQueue> set = new HashSet();
-        set.add(new MessageQueue(topic, "brk", 1));
-        pullConsumerScheduleService.putTask(topic, set);
+	@Test
+	public void testSource() throws Exception {
+		List<MessageExt> msgFoundList = new ArrayList<>();
+		MessageExt messageExt = new MessageExt();
+		messageExt.setKeys("keys");
+		messageExt.setBody("body data".getBytes());
+		messageExt.setBornTimestamp(System.currentTimeMillis());
+		msgFoundList.add(messageExt);
+		PullResult pullResult = new PullResult(PullStatus.FOUND, 3, 1, 5, msgFoundList);
 
-        MessageExt msg = pullResult.getMsgFoundList().get(0);
+		when(consumer.fetchConsumeOffset(any(MessageQueue.class), anyBoolean())).thenReturn(2L);
+		when(consumer.pull(any(MessageQueue.class), anyString(), anyLong(), anyInt())).thenReturn(pullResult);
 
-        // atLeastOnce: re-pulling immediately when messages found before
-        verify(context, atLeastOnce()).collectWithTimestamp(msg, msg.getBornTimestamp());
-    }
+		SourceContext context = mock(SourceContext.class);
+		when(context.getCheckpointLock()).thenReturn(new Object());
 
-    @Test
-    public void close() throws Exception {
-        rocketMQSource.close();
+		rocketMQSource.run(context);
 
-        verify(consumer).shutdown();
-    }
+		// schedule the pull task
+		Set<MessageQueue> set = new HashSet();
+		set.add(new MessageQueue(topic, "brk", 1));
+		pullConsumerScheduleService.putTask(topic, set);
 
-    class SingleRunningCheck extends RunningChecker {
-        @Override
-        public boolean isRunning() {
-            return false;
-        }
-    }
+		MessageExt msg = pullResult.getMsgFoundList().get(0);
+
+		// atLeastOnce: re-pulling immediately when messages found before
+		verify(context, atLeastOnce()).collectWithTimestamp(msg, msg.getBornTimestamp());
+	}
+
+	@Test
+	public void close() throws Exception {
+		rocketMQSource.close();
+
+		verify(consumer).shutdown();
+	}
+
+	class SingleRunningCheck extends RunningChecker {
+
+		@Override
+		public boolean isRunning() {
+			return false;
+		}
+
+	}
+
 }

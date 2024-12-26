@@ -42,66 +42,57 @@ import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** Tests for {@link org.apache.rocketmq.flink.sink.table.RocketMQDynamicTableSinkFactory}. */
+/** Tests for {@link RocketMQDynamicTableSinkFactory}. */
 public class RocketMQDynamicTableSinkFactoryTest {
 
-    private static final ResolvedSchema SCHEMA =
-            new ResolvedSchema(
-                    Collections.singletonList(Column.physical("name", STRING().notNull())),
-                    new ArrayList<>(),
-                    null);
+	private static final ResolvedSchema SCHEMA = new ResolvedSchema(
+			Collections.singletonList(Column.physical("name", STRING().notNull())), new ArrayList<>(), null);
 
-    private static final String IDENTIFIER = "rocketmq";
-    private static final String TOPIC = "test_sink";
-    private static final String PRODUCER_GROUP = "test_producer";
-    private static final String NAME_SERVER_ADDRESS =
-            "http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080";
+	private static final String IDENTIFIER = "rocketmq";
 
-    @Test
-    public void testRocketMQDynamicTableSinkWithLegalOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", IDENTIFIER);
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
-        options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
-        final DynamicTableSink tableSink = createDynamicTableSink(options);
-        assertTrue(tableSink instanceof RocketMQDynamicTableSink);
-        assertEquals(RocketMQDynamicTableSink.class.getName(), tableSink.asSummaryString());
-    }
+	private static final String TOPIC = "test_sink";
 
-    @Test(expected = ValidationException.class)
-    public void testRocketMQDynamicTableSinkWithoutRequiredOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put("connector", IDENTIFIER);
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
-        options.put(RocketMQOptions.OPTIONAL_TAG.key(), "test_tag");
-        createDynamicTableSink(options);
-    }
+	private static final String PRODUCER_GROUP = "test_producer";
 
-    @Test(expected = ValidationException.class)
-    public void testRocketMQDynamicTableSinkWithUnknownOption() {
-        final Map<String, String> options = new HashMap<>();
-        options.put(RocketMQOptions.TOPIC.key(), TOPIC);
-        options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
-        options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
-        options.put("unknown", "test_option");
-        createDynamicTableSink(options);
-    }
+	private static final String NAME_SERVER_ADDRESS = "http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080";
 
-    private static DynamicTableSink createDynamicTableSink(Map<String, String> options) {
-        return FactoryUtil.createTableSink(
-                null,
-                ObjectIdentifier.of("default", "default", "mq"),
-                new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
-                                "mock sink",
-                                Collections.emptyList(),
-                                options),
-                        SCHEMA),
-                new Configuration(),
-                RocketMQDynamicTableSinkFactory.class.getClassLoader(),
-                false);
-    }
+	@Test
+	public void testRocketMQDynamicTableSinkWithLegalOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put("connector", IDENTIFIER);
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
+		options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
+		final DynamicTableSink tableSink = createDynamicTableSink(options);
+		assertTrue(tableSink instanceof RocketMQDynamicTableSink);
+		assertEquals(RocketMQDynamicTableSink.class.getName(), tableSink.asSummaryString());
+	}
+
+	@Test(expected = ValidationException.class)
+	public void testRocketMQDynamicTableSinkWithoutRequiredOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put("connector", IDENTIFIER);
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
+		options.put(RocketMQOptions.OPTIONAL_TAG.key(), "test_tag");
+		createDynamicTableSink(options);
+	}
+
+	@Test(expected = ValidationException.class)
+	public void testRocketMQDynamicTableSinkWithUnknownOption() {
+		final Map<String, String> options = new HashMap<>();
+		options.put(RocketMQOptions.TOPIC.key(), TOPIC);
+		options.put(RocketMQOptions.PRODUCER_GROUP.key(), PRODUCER_GROUP);
+		options.put(RocketMQOptions.NAME_SERVER_ADDRESS.key(), NAME_SERVER_ADDRESS);
+		options.put("unknown", "test_option");
+		createDynamicTableSink(options);
+	}
+
+	private static DynamicTableSink createDynamicTableSink(Map<String, String> options) {
+		return FactoryUtil.createTableSink(null, ObjectIdentifier.of("default", "default", "mq"),
+				new ResolvedCatalogTable(CatalogTable.of(Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
+						"mock sink", Collections.emptyList(), options), SCHEMA),
+				new Configuration(), RocketMQDynamicTableSinkFactory.class.getClassLoader(), false);
+	}
+
 }

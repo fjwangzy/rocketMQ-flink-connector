@@ -33,18 +33,17 @@ import static org.junit.Assert.assertEquals;
 /** Test for {@link RowKeyValueDeserializationSchema}. */
 public class RowKeyValueDeserializationSchemaTest {
 
-    @Test
-    public void testDeserializeKeyAndValue() {
-        TableSchema tableSchema =
-                new TableSchema.Builder().field("varchar", DataTypes.VARCHAR(100)).build();
-        RowKeyValueDeserializationSchema deserializationSchema =
-                new RowKeyValueDeserializationSchema.Builder()
-                        .setTableSchema(tableSchema)
-                        .setProperties(new HashMap<>())
-                        .build();
-        MessageExt messageExt = new MessageExt();
-        messageExt.setBody("test_deserialize_key_and_value".getBytes());
-        RowData rowData = deserializationSchema.deserializeKeyAndValue(null, messageExt.getBody());
-        assertEquals(new String(messageExt.getBody()), rowData.getString(0).toString());
-    }
+	@Test
+	public void testDeserializeKeyAndValue() {
+		TableSchema tableSchema = new TableSchema.Builder().field("varchar", DataTypes.VARCHAR(100)).build();
+		RowKeyValueDeserializationSchema deserializationSchema = new RowKeyValueDeserializationSchema.Builder()
+			.setTableSchema(tableSchema)
+			.setProperties(new HashMap<>())
+			.build();
+		MessageExt messageExt = new MessageExt();
+		messageExt.setBody("test_deserialize_key_and_value".getBytes());
+		RowData rowData = deserializationSchema.deserializeKeyAndValue(null, messageExt.getBody());
+		assertEquals(new String(messageExt.getBody()), rowData.getString(0).toString());
+	}
+
 }

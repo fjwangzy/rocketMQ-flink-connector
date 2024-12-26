@@ -46,263 +46,197 @@ import static org.apache.rocketmq.flink.sink.table.RocketMQRowDataConverter.Meta
 /** Defines the dynamic table sink of RocketMQ. */
 public class RocketMQDynamicTableSink implements DynamicTableSink, SupportsWritingMetadata {
 
-    private final DescriptorProperties properties;
-    private final TableSchema schema;
+	private final DescriptorProperties properties;
 
-    private final String topic;
-    private final String producerGroup;
-    private final String nameServerAddress;
-    private final String tag;
-    private final String dynamicColumn;
-    private final String fieldDelimiter;
-    private final String encoding;
+	private final TableSchema schema;
 
-    private final String accessKey;
-    private final String secretKey;
+	private final String topic;
 
-    private final long retryTimes;
-    private final long sleepTime;
+	private final String producerGroup;
 
-    private final boolean isDynamicTag;
-    private final boolean isDynamicTagIncluded;
-    private final boolean writeKeysToBody;
+	private final String nameServerAddress;
 
-    private final String[] keyColumns;
+	private final String tag;
 
-    private List<String> metadataKeys;
+	private final String dynamicColumn;
 
-    public RocketMQDynamicTableSink(
-            DescriptorProperties properties,
-            TableSchema schema,
-            String topic,
-            String producerGroup,
-            String nameServerAddress,
-            String tag,
-            String dynamicColumn,
-            String fieldDelimiter,
-            String encoding,
-            long retryTimes,
-            long sleepTime,
-            boolean isDynamicTag,
-            boolean isDynamicTagIncluded,
-            boolean writeKeysToBody,
-            String[] keyColumns) {
+	private final String fieldDelimiter;
 
-        this(
-                properties,
-                schema,
-                topic,
-                producerGroup,
-                nameServerAddress,
-                null,
-                null,
-                tag,
-                dynamicColumn,
-                fieldDelimiter,
-                encoding,
-                retryTimes,
-                sleepTime,
-                isDynamicTag,
-                isDynamicTagIncluded,
-                writeKeysToBody,
-                keyColumns);
-    }
+	private final String encoding;
 
-    public RocketMQDynamicTableSink(
-            DescriptorProperties properties,
-            TableSchema schema,
-            String topic,
-            String producerGroup,
-            String nameServerAddress,
-            String accessKey,
-            String secretKey,
-            String tag,
-            String dynamicColumn,
-            String fieldDelimiter,
-            String encoding,
-            long retryTimes,
-            long sleepTime,
-            boolean isDynamicTag,
-            boolean isDynamicTagIncluded,
-            boolean writeKeysToBody,
-            String[] keyColumns) {
-        this.properties = properties;
-        this.schema = schema;
-        this.topic = topic;
-        this.producerGroup = producerGroup;
-        this.nameServerAddress = nameServerAddress;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
-        this.tag = tag;
-        this.dynamicColumn = dynamicColumn;
-        this.fieldDelimiter = fieldDelimiter;
-        this.encoding = encoding;
-        this.retryTimes = retryTimes;
-        this.sleepTime = sleepTime;
-        this.isDynamicTag = isDynamicTag;
-        this.isDynamicTagIncluded = isDynamicTagIncluded;
-        this.writeKeysToBody = writeKeysToBody;
-        this.keyColumns = keyColumns;
-        this.metadataKeys = Collections.emptyList();
-    }
+	private final String accessKey;
 
-    @Override
-    public ChangelogMode getChangelogMode(ChangelogMode requestedMode) {
-        ChangelogMode.Builder builder = ChangelogMode.newBuilder();
-        for (RowKind kind : requestedMode.getContainedKinds()) {
-            if (kind != RowKind.UPDATE_BEFORE) {
-                builder.addContainedKind(kind);
-            }
-        }
-        return builder.build();
-    }
+	private final String secretKey;
 
-    @Override
-    public DynamicTableSink.SinkRuntimeProvider getSinkRuntimeProvider(
-            DynamicTableSink.Context context) {
-        return SinkFunctionProvider.of(new RocketMQRowDataSink(createSink(), createConverter()));
-    }
+	private final long retryTimes;
 
-    @Override
-    public Map<String, DataType> listWritableMetadata() {
-        final Map<String, DataType> metadataMap = new LinkedHashMap<>();
-        Stream.of(WritableMetadata.values())
-                .forEachOrdered(m -> metadataMap.put(m.key, m.dataType));
-        return metadataMap;
-    }
+	private final long sleepTime;
 
-    @Override
-    public void applyWritableMetadata(List<String> metadataKeys, DataType consumedDataType) {
-        this.metadataKeys = metadataKeys;
-    }
+	private final boolean isDynamicTag;
 
-    @Override
-    public DynamicTableSink copy() {
-        RocketMQDynamicTableSink tableSink =
-                new RocketMQDynamicTableSink(
-                        properties,
-                        schema,
-                        topic,
-                        producerGroup,
-                        nameServerAddress,
-                        accessKey,
-                        secretKey,
-                        tag,
-                        dynamicColumn,
-                        fieldDelimiter,
-                        encoding,
-                        retryTimes,
-                        sleepTime,
-                        isDynamicTag,
-                        isDynamicTagIncluded,
-                        writeKeysToBody,
-                        keyColumns);
-        tableSink.metadataKeys = metadataKeys;
-        return tableSink;
-    }
+	private final boolean isDynamicTagIncluded;
 
-    @Override
-    public String asSummaryString() {
-        return RocketMQDynamicTableSink.class.getName();
-    }
+	private final boolean writeKeysToBody;
 
-    private RocketMQSink createSink() {
-        return new RocketMQSink(getProducerProps());
-    }
+	private final String[] keyColumns;
 
-    private RocketMQRowDataConverter createConverter() {
-        final int[] metadataPositions =
-                Stream.of(WritableMetadata.values())
-                        .mapToInt(
-                                m -> {
-                                    final int pos = metadataKeys.indexOf(m.key);
-                                    if (pos < 0) {
-                                        return -1;
-                                    }
-                                    return schema.getFieldCount() + pos;
-                                })
-                        .toArray();
-        return new RocketMQRowDataConverter(
-                topic,
-                tag,
-                dynamicColumn,
-                fieldDelimiter,
-                encoding,
-                isDynamicTag,
-                isDynamicTagIncluded,
-                writeKeysToBody,
-                keyColumns,
-                convertToRowTypeInfo(schema.toRowDataType(), schema.getFieldNames()),
-                schema.getFieldDataTypes(),
-                metadataKeys.size() > 0,
-                metadataPositions);
-    }
+	private List<String> metadataKeys;
 
-    private Properties getProducerProps() {
-        Properties producerProps = new Properties();
-        producerProps.setProperty(RocketMQConfig.PRODUCER_GROUP, producerGroup);
-        producerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR, nameServerAddress);
-        if (accessKey != null && secretKey != null) {
-            producerProps.setProperty(RocketMQConfig.ACCESS_KEY, accessKey);
-            producerProps.setProperty(RocketMQConfig.SECRET_KEY, secretKey);
-        }
-        return producerProps;
-    }
+	public RocketMQDynamicTableSink(DescriptorProperties properties, TableSchema schema, String topic,
+			String producerGroup, String nameServerAddress, String tag, String dynamicColumn, String fieldDelimiter,
+			String encoding, long retryTimes, long sleepTime, boolean isDynamicTag, boolean isDynamicTagIncluded,
+			boolean writeKeysToBody, String[] keyColumns) {
 
-    protected static RowTypeInfo convertToRowTypeInfo(
-            DataType fieldsDataType, String[] fieldNames) {
-        final TypeInformation<?>[] fieldTypes =
-                fieldsDataType.getChildren().stream()
-                        .map(LegacyTypeInfoDataTypeConverter::toLegacyTypeInfo)
-                        .toArray(TypeInformation[]::new);
-        return new RowTypeInfo(fieldTypes, fieldNames);
-    }
+		this(properties, schema, topic, producerGroup, nameServerAddress, null, null, tag, dynamicColumn,
+				fieldDelimiter, encoding, retryTimes, sleepTime, isDynamicTag, isDynamicTagIncluded, writeKeysToBody,
+				keyColumns);
+	}
 
-    // --------------------------------------------------------------------------------------------
-    // Metadata handling
-    // --------------------------------------------------------------------------------------------
+	public RocketMQDynamicTableSink(DescriptorProperties properties, TableSchema schema, String topic,
+			String producerGroup, String nameServerAddress, String accessKey, String secretKey, String tag,
+			String dynamicColumn, String fieldDelimiter, String encoding, long retryTimes, long sleepTime,
+			boolean isDynamicTag, boolean isDynamicTagIncluded, boolean writeKeysToBody, String[] keyColumns) {
+		this.properties = properties;
+		this.schema = schema;
+		this.topic = topic;
+		this.producerGroup = producerGroup;
+		this.nameServerAddress = nameServerAddress;
+		this.accessKey = accessKey;
+		this.secretKey = secretKey;
+		this.tag = tag;
+		this.dynamicColumn = dynamicColumn;
+		this.fieldDelimiter = fieldDelimiter;
+		this.encoding = encoding;
+		this.retryTimes = retryTimes;
+		this.sleepTime = sleepTime;
+		this.isDynamicTag = isDynamicTag;
+		this.isDynamicTagIncluded = isDynamicTagIncluded;
+		this.writeKeysToBody = writeKeysToBody;
+		this.keyColumns = keyColumns;
+		this.metadataKeys = Collections.emptyList();
+	}
 
-    enum WritableMetadata {
-        KEYS(
-                "keys",
-                DataTypes.STRING().nullable(),
-                new MetadataConverter() {
-                    private static final long serialVersionUID = 1L;
+	@Override
+	public ChangelogMode getChangelogMode(ChangelogMode requestedMode) {
+		ChangelogMode.Builder builder = ChangelogMode.newBuilder();
+		for (RowKind kind : requestedMode.getContainedKinds()) {
+			if (kind != RowKind.UPDATE_BEFORE) {
+				builder.addContainedKind(kind);
+			}
+		}
+		return builder.build();
+	}
 
-                    @Override
-                    public Object read(RowData row, int pos) {
-                        if (row.isNullAt(pos)) {
-                            return null;
-                        }
-                        return row.getString(pos).toString();
-                    }
-                }),
+	@Override
+	public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
+		return SinkFunctionProvider.of(new RocketMQRowDataSink(createSink(), createConverter()));
+	}
 
-        TAGS(
-                "tags",
-                DataTypes.STRING().nullable(),
-                new MetadataConverter() {
-                    private static final long serialVersionUID = 1L;
+	@Override
+	public Map<String, DataType> listWritableMetadata() {
+		final Map<String, DataType> metadataMap = new LinkedHashMap<>();
+		Stream.of(WritableMetadata.values()).forEachOrdered(m -> metadataMap.put(m.key, m.dataType));
+		return metadataMap;
+	}
 
-                    @Override
-                    public Object read(RowData row, int pos) {
-                        if (row.isNullAt(pos)) {
-                            return null;
-                        }
-                        return row.getString(pos).toString();
-                    }
-                });
+	@Override
+	public void applyWritableMetadata(List<String> metadataKeys, DataType consumedDataType) {
+		this.metadataKeys = metadataKeys;
+	}
 
-        final String key;
+	@Override
+	public DynamicTableSink copy() {
+		RocketMQDynamicTableSink tableSink = new RocketMQDynamicTableSink(properties, schema, topic, producerGroup,
+				nameServerAddress, accessKey, secretKey, tag, dynamicColumn, fieldDelimiter, encoding, retryTimes,
+				sleepTime, isDynamicTag, isDynamicTagIncluded, writeKeysToBody, keyColumns);
+		tableSink.metadataKeys = metadataKeys;
+		return tableSink;
+	}
 
-        final DataType dataType;
+	@Override
+	public String asSummaryString() {
+		return RocketMQDynamicTableSink.class.getName();
+	}
 
-        final MetadataConverter converter;
+	private RocketMQSink createSink() {
+		return new RocketMQSink(getProducerProps());
+	}
 
-        WritableMetadata(String key, DataType dataType, MetadataConverter converter) {
-            this.key = key;
-            this.dataType = dataType;
-            this.converter = converter;
-        }
-    }
+	private RocketMQRowDataConverter createConverter() {
+		final int[] metadataPositions = Stream.of(WritableMetadata.values()).mapToInt(m -> {
+			final int pos = metadataKeys.indexOf(m.key);
+			if (pos < 0) {
+				return -1;
+			}
+			return schema.getFieldCount() + pos;
+		}).toArray();
+		return new RocketMQRowDataConverter(topic, tag, dynamicColumn, fieldDelimiter, encoding, isDynamicTag,
+				isDynamicTagIncluded, writeKeysToBody, keyColumns,
+				convertToRowTypeInfo(schema.toRowDataType(), schema.getFieldNames()), schema.getFieldDataTypes(),
+				metadataKeys.size() > 0, metadataPositions);
+	}
+
+	private Properties getProducerProps() {
+		Properties producerProps = new Properties();
+		producerProps.setProperty(RocketMQConfig.PRODUCER_GROUP, producerGroup);
+		producerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR, nameServerAddress);
+		if (accessKey != null && secretKey != null) {
+			producerProps.setProperty(RocketMQConfig.ACCESS_KEY, accessKey);
+			producerProps.setProperty(RocketMQConfig.SECRET_KEY, secretKey);
+		}
+		return producerProps;
+	}
+
+	protected static RowTypeInfo convertToRowTypeInfo(DataType fieldsDataType, String[] fieldNames) {
+		final TypeInformation<?>[] fieldTypes = fieldsDataType.getChildren()
+			.stream()
+			.map(LegacyTypeInfoDataTypeConverter::toLegacyTypeInfo)
+			.toArray(TypeInformation[]::new);
+		return new RowTypeInfo(fieldTypes, fieldNames);
+	}
+
+	// --------------------------------------------------------------------------------------------
+	// Metadata handling
+	// --------------------------------------------------------------------------------------------
+
+	enum WritableMetadata {
+
+		KEYS("keys", DataTypes.STRING().nullable(), new MetadataConverter() {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Object read(RowData row, int pos) {
+				if (row.isNullAt(pos)) {
+					return null;
+				}
+				return row.getString(pos).toString();
+			}
+		}),
+
+		TAGS("tags", DataTypes.STRING().nullable(), new MetadataConverter() {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Object read(RowData row, int pos) {
+				if (row.isNullAt(pos)) {
+					return null;
+				}
+				return row.getString(pos).toString();
+			}
+		});
+
+		final String key;
+
+		final DataType dataType;
+
+		final MetadataConverter converter;
+
+		WritableMetadata(String key, DataType dataType, MetadataConverter converter) {
+			this.key = key;
+			this.dataType = dataType;
+			this.converter = converter;
+		}
+
+	}
+
 }

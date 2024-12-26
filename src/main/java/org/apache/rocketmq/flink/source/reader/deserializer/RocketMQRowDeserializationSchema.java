@@ -33,72 +33,66 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A row data wrapper class that wraps a {@link RocketMQDeserializationSchema} to deserialize {@link
- * MessageExt}.
+ * A row data wrapper class that wraps a {@link RocketMQDeserializationSchema} to
+ * deserialize {@link MessageExt}.
  */
 public class RocketMQRowDeserializationSchema implements RocketMQDeserializationSchema<RowData> {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private final RowDeserializationSchema deserializationSchema;
+	private final RowDeserializationSchema deserializationSchema;
 
-    private transient List<BytesMessage> bytesMessages = new ArrayList<>(1);
+	private transient List<BytesMessage> bytesMessages = new ArrayList<>(1);
 
-    public RocketMQRowDeserializationSchema(
-            TableSchema tableSchema,
-            Map<String, String> properties,
-            boolean hasMetadata,
-            MetadataConverter[] metadataConverters) {
-        deserializationSchema =
-                new RowDeserializationSchema.Builder()
-                        .setProperties(properties)
-                        .setTableSchema(tableSchema)
-                        .setHasMetadata(hasMetadata)
-                        .setMetadataConverters(metadataConverters)
-                        .build();
-    }
+	public RocketMQRowDeserializationSchema(TableSchema tableSchema, Map<String, String> properties,
+			boolean hasMetadata, MetadataConverter[] metadataConverters) {
+		deserializationSchema = new RowDeserializationSchema.Builder().setProperties(properties)
+			.setTableSchema(tableSchema)
+			.setHasMetadata(hasMetadata)
+			.setMetadataConverters(metadataConverters)
+			.build();
+	}
 
-    @Override
-    public void open(InitializationContext context) {
-        deserializationSchema.open(context);
-        bytesMessages = new ArrayList<>();
-    }
+	@Override
+	public void open(InitializationContext context) {
+		deserializationSchema.open(context);
+		bytesMessages = new ArrayList<>();
+	}
 
-    @Override
-    public void deserialize(List<MessageExt> input, Collector<RowData> collector) {
-        extractMessages(input);
-        deserializationSchema.deserialize(bytesMessages, collector);
-    }
+	@Override
+	public void deserialize(List<MessageExt> input, Collector<RowData> collector) {
+		extractMessages(input);
+		deserializationSchema.deserialize(bytesMessages, collector);
+	}
 
-    @Override
-    public TypeInformation<RowData> getProducedType() {
-        return deserializationSchema.getProducedType();
-    }
+	@Override
+	public TypeInformation<RowData> getProducedType() {
+		return deserializationSchema.getProducedType();
+	}
 
-    private void extractMessages(List<MessageExt> messages) {
-        bytesMessages = new ArrayList<>(messages.size());
-        for (MessageExt message : messages) {
-            BytesMessage bytesMessage = new BytesMessage();
-            bytesMessage.setData(message.getBody());
-            if (message.getProperties() != null) {
-                bytesMessage.setProperties(message.getProperties());
-            }
-            bytesMessage.setProperty("__topic__", message.getTopic());
-            bytesMessage.setProperty(
-                    "__store_timestamp__", String.valueOf(message.getStoreTimestamp()));
-            bytesMessage.setProperty(
-                    "__born_timestamp__", String.valueOf(message.getBornTimestamp()));
-            bytesMessage.setProperty("__queue_id__", String.valueOf(message.getQueueId()));
-            bytesMessage.setProperty("__queue_offset__", String.valueOf(message.getQueueOffset()));
-            bytesMessage.setProperty("__msg_id__", message.getMsgId());
-            bytesMessage.setProperty("__keys__", message.getKeys());
-            bytesMessage.setProperty("__tags__", message.getTags());
-            bytesMessages.add(bytesMessage);
-        }
-    }
+	private void extractMessages(List<MessageExt> messages) {
+		bytesMessages = new ArrayList<>(messages.size());
+		for (MessageExt message : messages) {
+			BytesMessage bytesMessage = new BytesMessage();
+			bytesMessage.setData(message.getBody());
+			if (message.getProperties() != null) {
+				bytesMessage.setProperties(message.getProperties());
+			}
+			bytesMessage.setProperty("__topic__", message.getTopic());
+			bytesMessage.setProperty("__store_timestamp__", String.valueOf(message.getStoreTimestamp()));
+			bytesMessage.setProperty("__born_timestamp__", String.valueOf(message.getBornTimestamp()));
+			bytesMessage.setProperty("__queue_id__", String.valueOf(message.getQueueId()));
+			bytesMessage.setProperty("__queue_offset__", String.valueOf(message.getQueueOffset()));
+			bytesMessage.setProperty("__msg_id__", message.getMsgId());
+			bytesMessage.setProperty("__keys__", message.getKeys());
+			bytesMessage.setProperty("__tags__", message.getTags());
+			bytesMessages.add(bytesMessage);
+		}
+	}
 
-    @VisibleForTesting
-    public List<BytesMessage> getBytesMessages() {
-        return bytesMessages;
-    }
+	@VisibleForTesting
+	public List<BytesMessage> getBytesMessages() {
+		return bytesMessages;
+	}
+
 }

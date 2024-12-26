@@ -18,6 +18,7 @@
 
 package org.apache.rocketmq.flink.source.reader.fetcher;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.flink.source.reader.OffsetCommitCallback;
 import org.apache.rocketmq.flink.source.reader.RocketMQPartitionSplitReader;
@@ -40,64 +41,63 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * The SplitFetcherManager for RocketMQ source. This class is needed to help commit the offsets to
- * RocketMQ using the consumer inside the {@link RocketMQPartitionSplitReader}.
+ * The SplitFetcherManager for RocketMQ source. This class is needed to help commit the
+ * offsets to RocketMQ using the consumer inside the {@link RocketMQPartitionSplitReader}.
  */
 public class RocketMQSourceFetcherManager<T>
-        extends SingleThreadFetcherManager<Tuple3<T, Long, Long>, RocketMQPartitionSplit> {
+		extends SingleThreadFetcherManager<Tuple3<T, Long, Long>, RocketMQPartitionSplit> {
 
-    /**
-     * Creates a new SplitFetcherManager with a single I/O threads.
-     *
-     * @param elementsQueue The queue that is used to hand over data from the I/O thread (the
-     *     fetchers) to the reader (which emits the records and book-keeps the state. This must be
-     *     the same queue instance that is also passed to the {@link SourceReaderBase}.
-     * @param splitReaderSupplier The factory for the split reader that connects to the source
-     *     system.
-     * @param splitFinishedHook Hook for handling finished splits in split fetchers.
-     */
-    public RocketMQSourceFetcherManager(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple3<T, Long, Long>>> elementsQueue,
-            Supplier<SplitReader<Tuple3<T, Long, Long>, RocketMQPartitionSplit>>
-                    splitReaderSupplier,
-            Consumer<Collection<String>> splitFinishedHook) {
-        super(elementsQueue, splitReaderSupplier, splitFinishedHook);
-    }
+	/**
+	 * Creates a new SplitFetcherManager with a single I/O threads.
+	 * @param elementsQueue The queue that is used to hand over data from the I/O thread
+	 * (the fetchers) to the reader (which emits the records and book-keeps the state.
+	 * This must be the same queue instance that is also passed to the
+	 * {@link SourceReaderBase}.
+	 * @param splitReaderSupplier The factory for the split reader that connects to the
+	 * source system.
+	 * @param splitFinishedHook Hook for handling finished splits in split fetchers.
+	 */
+	public RocketMQSourceFetcherManager(
+			FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple3<T, Long, Long>>> elementsQueue,
+			Supplier<SplitReader<Tuple3<T, Long, Long>, RocketMQPartitionSplit>> splitReaderSupplier,
+			Consumer<Collection<String>> splitFinishedHook) {
+		// super(elementsQueue, splitReaderSupplier, splitFinishedHook);
+		super(splitReaderSupplier, new Configuration(), splitFinishedHook);
+	}
 
-    public void commitOffsets(
-            Map<MessageQueue, Long> committedOffsets, OffsetCommitCallback callback) {
-        if (committedOffsets.isEmpty()) {
-            return;
-        }
+	public void commitOffsets(Map<MessageQueue, Long> committedOffsets, OffsetCommitCallback callback) {
+		if (committedOffsets.isEmpty()) {
+			return;
+		}
 
-        SplitFetcher<Tuple3<T, Long, Long>, RocketMQPartitionSplit> splitFetcher = fetchers.get(0);
-        if (splitFetcher != null) {
-            commit(splitFetcher, committedOffsets, callback);
-        } else {
-            splitFetcher = createSplitFetcher();
-            commit(splitFetcher, committedOffsets, callback);
-            startFetcher(splitFetcher);
-        }
-    }
+		SplitFetcher<Tuple3<T, Long, Long>, RocketMQPartitionSplit> splitFetcher = fetchers.get(0);
+		if (splitFetcher != null) {
+			commit(splitFetcher, committedOffsets, callback);
+		}
+		else {
+			splitFetcher = createSplitFetcher();
+			commit(splitFetcher, committedOffsets, callback);
+			startFetcher(splitFetcher);
+		}
+	}
 
-    private void commit(
-            SplitFetcher<Tuple3<T, Long, Long>, RocketMQPartitionSplit> splitFetcher,
-            Map<MessageQueue, Long> committedOffsets,
-            OffsetCommitCallback callback) {
-        RocketMQPartitionSplitReader<T> rocketMQReader =
-                (RocketMQPartitionSplitReader<T>) splitFetcher.getSplitReader();
+	private void commit(SplitFetcher<Tuple3<T, Long, Long>, RocketMQPartitionSplit> splitFetcher,
+			Map<MessageQueue, Long> committedOffsets, OffsetCommitCallback callback) {
+		RocketMQPartitionSplitReader<T> rocketMQReader = (RocketMQPartitionSplitReader<T>) splitFetcher
+			.getSplitReader();
 
-        splitFetcher.enqueueTask(
-                new SplitFetcherTask() {
-                    @SneakyThrows
-                    @Override
-                    public boolean run() {
-                        rocketMQReader.notifyCheckpointComplete(committedOffsets, callback);
-                        return true;
-                    }
+		splitFetcher.enqueueTask(new SplitFetcherTask() {
+			@SneakyThrows
+			@Override
+			public boolean run() {
+				rocketMQReader.notifyCheckpointComplete(committedOffsets, callback);
+				return true;
+			}
 
-                    @Override
-                    public void wakeUp() {}
-                });
-    }
+			@Override
+			public void wakeUp() {
+			}
+		});
+	}
+
 }

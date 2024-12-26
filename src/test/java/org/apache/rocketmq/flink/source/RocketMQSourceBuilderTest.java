@@ -36,107 +36,79 @@ import java.util.HashMap;
 /** Tests for {@link RocketMQSourceBuilder}. */
 public class RocketMQSourceBuilderTest {
 
-    private RocketMQSourceBuilder<String> builder;
+	private RocketMQSourceBuilder<String> builder;
 
-    @Before
-    public void open() {
-        builder =
-                new RocketMQSourceBuilder<String>()
-                        .setNameServerAddress("localhost:5789")
-                        .setTopic("tp_test")
-                        .setConsumerGroup("group_test")
-                        .setDeserializer(
-                                new RocketMQValueOnlyDeserializationSchemaWrapper<>(
-                                        new SimpleStringSchema()));
-    }
+	@Before
+	public void open() {
+		builder = new RocketMQSourceBuilder<String>().setNameServerAddress("localhost:5789")
+			.setTopic("tp_test")
+			.setConsumerGroup("group_test")
+			.setDeserializer(new RocketMQValueOnlyDeserializationSchemaWrapper<>(new SimpleStringSchema()));
+	}
 
-    @Test
-    public void testPartitionDiscoverOnBoundedness() {
-        final IllegalArgumentException exception =
-                Assert.assertThrows(
-                        IllegalArgumentException.class,
-                        () ->
-                                builder.setStopInMs(3000L)
-                                        .setPartitionDiscoveryIntervalMs(50000L)
-                                        .build());
-        MatcherAssert.assertThat(
-                exception.getMessage(),
-                CoreMatchers.containsString("Bounded stream didn't support partitionDiscovery."));
-    }
+	@Test
+	public void testPartitionDiscoverOnBoundedness() {
+		final IllegalArgumentException exception = Assert.assertThrows(IllegalArgumentException.class,
+				() -> builder.setStopInMs(3000L).setPartitionDiscoveryIntervalMs(50000L).build());
+		MatcherAssert.assertThat(exception.getMessage(),
+				CoreMatchers.containsString("Bounded stream didn't support partitionDiscovery."));
+	}
 
-    @Test
-    public void testStartFromEarliest() {
-        RocketMQSource<String> source = builder.setStartFromEarliest().build();
-        Assert.assertEquals(
-                StartupMode.EARLIEST,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
-        Assert.assertEquals(
-                Long.MAX_VALUE,
-                source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
-    }
+	@Test
+	public void testStartFromEarliest() {
+		RocketMQSource<String> source = builder.setStartFromEarliest().build();
+		Assert.assertEquals(StartupMode.EARLIEST,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
+		Assert.assertEquals(Long.MAX_VALUE, source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
+	}
 
-    @Test
-    public void testStartFromLatest() {
-        RocketMQSource<String> source = builder.setStartFromLatest().build();
-        Assert.assertEquals(
-                StartupMode.LATEST,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
-        Assert.assertEquals(
-                Long.MAX_VALUE,
-                source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
-    }
+	@Test
+	public void testStartFromLatest() {
+		RocketMQSource<String> source = builder.setStartFromLatest().build();
+		Assert.assertEquals(StartupMode.LATEST,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
+		Assert.assertEquals(Long.MAX_VALUE, source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
+	}
 
-    @Test
-    public void testStartFromTimeStamp() {
-        long startFlag = 1666794040000L;
-        RocketMQSource<String> source = builder.setStartFromTimeStamp(startFlag).build();
-        Assert.assertEquals(
-                StartupMode.TIMESTAMP,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
-        Assert.assertEquals(
-                startFlag,
-                source.getConfiguration()
-                        .getLong(RocketMQOptions.OPTIONAL_SCAN_STARTUP_TIMESTAMP_MILLIS));
-        Assert.assertEquals(
-                Long.MAX_VALUE,
-                source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
-    }
+	@Test
+	public void testStartFromTimeStamp() {
+		long startFlag = 1666794040000L;
+		RocketMQSource<String> source = builder.setStartFromTimeStamp(startFlag).build();
+		Assert.assertEquals(StartupMode.TIMESTAMP,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
+		Assert.assertEquals(startFlag,
+				source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_SCAN_STARTUP_TIMESTAMP_MILLIS));
+		Assert.assertEquals(Long.MAX_VALUE, source.getConfiguration().getLong(RocketMQOptions.OPTIONAL_END_TIME_STAMP));
+	}
 
-    @Test
-    public void testStartFromGroupOffsets() {
-        RocketMQSource<String> source = builder.setStartFromGroupOffsets().build();
-        Assert.assertEquals(
-                StartupMode.GROUP_OFFSETS,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
-        Assert.assertEquals(
-                OffsetResetStrategy.LATEST,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
-        Assert.assertEquals(
-                OffsetResetStrategy.EARLIEST,
-                builder.setStartFromGroupOffsets(OffsetResetStrategy.EARLIEST)
-                        .build()
-                        .getConfiguration()
-                        .get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
-    }
+	@Test
+	public void testStartFromGroupOffsets() {
+		RocketMQSource<String> source = builder.setStartFromGroupOffsets().build();
+		Assert.assertEquals(StartupMode.GROUP_OFFSETS,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
+		Assert.assertEquals(OffsetResetStrategy.LATEST,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
+		Assert.assertEquals(OffsetResetStrategy.EARLIEST,
+				builder.setStartFromGroupOffsets(OffsetResetStrategy.EARLIEST)
+					.build()
+					.getConfiguration()
+					.get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
+	}
 
-    @Test
-    public void StartFromSpecificOffsets() {
-        HashMap<MessageQueue, Long> specificOffsets = new HashMap<>();
-        specificOffsets.put(new MessageQueue("topic", "broker", 0), 1L);
-        specificOffsets.put(new MessageQueue("topic", "broker", 1), 2L);
-        RocketMQSource<String> source =
-                builder.setStartFromSpecificOffsets(specificOffsets)
-                        .setCommitOffsetAuto(true)
-                        .build();
-        Assert.assertEquals(
-                StartupMode.SPECIFIC_OFFSETS,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
-        Assert.assertEquals(
-                OffsetResetStrategy.LATEST,
-                source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
-        Assert.assertEquals(
-                specificOffsets.toString(),
-                source.getConfiguration()
-                        .get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_SPECIFIC_OFFSETS));
-    }
+	@Test
+	public void StartFromSpecificOffsets() {
+		HashMap<MessageQueue, Long> specificOffsets = new HashMap<>();
+		specificOffsets.put(new MessageQueue("topic", "broker", 0), 1L);
+		specificOffsets.put(new MessageQueue("topic", "broker", 1), 2L);
+		RocketMQSource<String> source = builder.setStartFromSpecificOffsets(specificOffsets)
+			.setCommitOffsetAuto(true)
+			.build();
+		Assert.assertEquals(StartupMode.SPECIFIC_OFFSETS,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_MODE));
+		Assert.assertEquals(OffsetResetStrategy.LATEST,
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_OFFSET_RESET_STRATEGY));
+		Assert.assertEquals(specificOffsets.toString(),
+				source.getConfiguration().get(RocketMQOptions.OPTIONAL_SCAN_STARTUP_SPECIFIC_OFFSETS));
+	}
+
 }

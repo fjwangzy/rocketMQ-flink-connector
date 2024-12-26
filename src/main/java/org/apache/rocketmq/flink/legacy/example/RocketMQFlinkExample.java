@@ -41,92 +41,85 @@ import static org.apache.rocketmq.flink.legacy.RocketMQConfig.DEFAULT_CONSUMER_T
 
 public class RocketMQFlinkExample {
 
-    /**
-     * Source Config
-     *
-     * @return properties
-     */
-    private static Properties getConsumerProps() {
-        Properties consumerProps = new Properties();
-        consumerProps.setProperty(
-                RocketMQConfig.NAME_SERVER_ADDR,
-                "http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080");
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_GROUP, "${ConsumerGroup}");
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_TOPIC, "${SourceTopic}");
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_TAG, DEFAULT_CONSUMER_TAG);
-        consumerProps.setProperty(RocketMQConfig.CONSUMER_OFFSET_RESET_TO, CONSUMER_OFFSET_LATEST);
-        consumerProps.setProperty(RocketMQConfig.ACCESS_KEY, "${AccessKey}");
-        consumerProps.setProperty(RocketMQConfig.SECRET_KEY, "${SecretKey}");
-        consumerProps.setProperty(RocketMQConfig.ACCESS_CHANNEL, AccessChannel.CLOUD.name());
-        return consumerProps;
-    }
+	/**
+	 * Source Config
+	 * @return properties
+	 */
+	private static Properties getConsumerProps() {
+		Properties consumerProps = new Properties();
+		consumerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR,
+				"http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080");
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_GROUP, "${ConsumerGroup}");
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_TOPIC, "${SourceTopic}");
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_TAG, DEFAULT_CONSUMER_TAG);
+		consumerProps.setProperty(RocketMQConfig.CONSUMER_OFFSET_RESET_TO, CONSUMER_OFFSET_LATEST);
+		consumerProps.setProperty(RocketMQConfig.ACCESS_KEY, "${AccessKey}");
+		consumerProps.setProperty(RocketMQConfig.SECRET_KEY, "${SecretKey}");
+		consumerProps.setProperty(RocketMQConfig.ACCESS_CHANNEL, AccessChannel.CLOUD.name());
+		return consumerProps;
+	}
 
-    /**
-     * Sink Config
-     *
-     * @return properties
-     */
-    private static Properties getProducerProps() {
-        Properties producerProps = new Properties();
-        producerProps.setProperty(
-                RocketMQConfig.NAME_SERVER_ADDR,
-                "http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080");
-        producerProps.setProperty(RocketMQConfig.PRODUCER_GROUP, "${ProducerGroup}");
-        producerProps.setProperty(RocketMQConfig.ACCESS_KEY, "${AccessKey}");
-        producerProps.setProperty(RocketMQConfig.SECRET_KEY, "${SecretKey}");
-        producerProps.setProperty(RocketMQConfig.ACCESS_CHANNEL, AccessChannel.CLOUD.name());
-        return producerProps;
-    }
+	/**
+	 * Sink Config
+	 * @return properties
+	 */
+	private static Properties getProducerProps() {
+		Properties producerProps = new Properties();
+		producerProps.setProperty(RocketMQConfig.NAME_SERVER_ADDR,
+				"http://${instanceId}.${region}.mq-internal.aliyuncs.com:8080");
+		producerProps.setProperty(RocketMQConfig.PRODUCER_GROUP, "${ProducerGroup}");
+		producerProps.setProperty(RocketMQConfig.ACCESS_KEY, "${AccessKey}");
+		producerProps.setProperty(RocketMQConfig.SECRET_KEY, "${SecretKey}");
+		producerProps.setProperty(RocketMQConfig.ACCESS_CHANNEL, AccessChannel.CLOUD.name());
+		return producerProps;
+	}
 
-    public static void main(String[] args) throws Exception {
+	public static void main(String[] args) throws Exception {
 
-        final ParameterTool params = ParameterTool.fromArgs(args);
+		final ParameterTool params = ParameterTool.fromArgs(args);
 
-        // for local
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+		// for local
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 
-        // for cluster
-        // StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		// for cluster
+		// StreamExecutionEnvironment env =
+		// StreamExecutionEnvironment.getExecutionEnvironment();
 
-        env.getConfig().setGlobalJobParameters(params);
-        env.setStateBackend(new MemoryStateBackend());
-        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+		env.getConfig().setGlobalJobParameters(params);
+		env.setStateBackend(new MemoryStateBackend());
+		env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        // start a checkpoint every 10s
-        env.enableCheckpointing(10000);
-        // advanced options:
-        // set mode to exactly-once (this is the default)
-        env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
-        // checkpoints have to complete within one minute, or are discarded
-        env.getCheckpointConfig().setCheckpointTimeout(60000);
-        // make sure 500 ms of progress happen between checkpoints
-        env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
-        // allow only one checkpoint to be in progress at the same time
-        env.getCheckpointConfig().setMaxConcurrentCheckpoints(1);
-        // enable externalized checkpoints which are retained after job cancellation
-        env.getCheckpointConfig()
-                .enableExternalizedCheckpoints(
-                        CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
+		// start a checkpoint every 10s
+		env.enableCheckpointing(10000);
+		// advanced options:
+		// set mode to exactly-once (this is the default)
+		env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
+		// checkpoints have to complete within one minute, or are discarded
+		env.getCheckpointConfig().setCheckpointTimeout(60000);
+		// make sure 500 ms of progress happen between checkpoints
+		env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
+		// allow only one checkpoint to be in progress at the same time
+		env.getCheckpointConfig().setMaxConcurrentCheckpoints(1);
+		// enable externalized checkpoints which are retained after job cancellation
+		env.getCheckpointConfig()
+			.enableExternalizedCheckpoints(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
 
-        Properties consumerProps = getConsumerProps();
-        Properties producerProps = getProducerProps();
+		Properties consumerProps = getConsumerProps();
+		Properties producerProps = getProducerProps();
 
-        SimpleTupleDeserializationSchema schema = new SimpleTupleDeserializationSchema();
+		SimpleTupleDeserializationSchema schema = new SimpleTupleDeserializationSchema();
 
-        DataStreamSource<Tuple2<String, String>> source =
-                env.addSource(new RocketMQSourceFunction<>(schema, consumerProps))
-                        .setParallelism(2);
+		DataStreamSource<Tuple2<String, String>> source = env
+			.addSource(new RocketMQSourceFunction<>(schema, consumerProps))
+			.setParallelism(2);
 
-        source.print();
-        source.process(new SourceMapFunction())
-                .process(new SinkMapFunction("FLINK_SINK", "*"))
-                .addSink(
-                        new RocketMQSink(producerProps)
-                                .withBatchFlushOnCheckpoint(true)
-                                .withBatchSize(32)
-                                .withAsync(true))
-                .setParallelism(2);
+		source.print();
+		source.process(new SourceMapFunction())
+			.process(new SinkMapFunction("FLINK_SINK", "*"))
+			.addSink(new RocketMQSink(producerProps).withBatchFlushOnCheckpoint(true).withBatchSize(32).withAsync(true))
+			.setParallelism(2);
 
-        env.execute("rocketmq-connect-flink");
-    }
+		env.execute("rocketmq-connect-flink");
+	}
+
 }

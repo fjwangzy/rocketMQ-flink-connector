@@ -28,78 +28,84 @@ import java.io.Serializable;
 /** RocketMQ connector metrics. */
 public class MetricUtils {
 
-    public static final String METRICS_TPS = "tps";
-    // https://cwiki.apache.org/confluence/display/FLINK/FLIP-33%3A+Standardize+Connector+Metrics
-    public static final String CURRENT_FETCH_EVENT_TIME_LAG = "currentFetchEventTimeLag";
-    public static final String CURRENT_EMIT_EVENT_TIME_LAG = "currentEmitEventTimeLag";
+	public static final String METRICS_TPS = "tps";
 
-    private static final String METRIC_GROUP_SINK = "sink";
-    private static final String METRICS_SINK_IN_TPS = "inTps";
-    private static final String METRICS_SINK_OUT_TPS = "outTps";
-    private static final String METRICS_SINK_OUT_BPS = "outBps";
-    private static final String METRICS_SINK_OUT_LATENCY = "outLatency";
+	// https://cwiki.apache.org/confluence/display/FLINK/FLIP-33%3A+Standardize+Connector+Metrics
+	public static final String CURRENT_FETCH_EVENT_TIME_LAG = "currentFetchEventTimeLag";
 
-    public static Meter registerSinkInTps(RuntimeContext context) {
-        Counter parserCounter =
-                context.getMetricGroup()
-                        .addGroup(METRIC_GROUP_SINK)
-                        .counter(METRICS_SINK_IN_TPS + "_counter", new SimpleCounter());
-        return context.getMetricGroup()
-                .addGroup(METRIC_GROUP_SINK)
-                .meter(METRICS_SINK_IN_TPS, new MeterView(parserCounter, 60));
-    }
+	public static final String CURRENT_EMIT_EVENT_TIME_LAG = "currentEmitEventTimeLag";
 
-    public static Meter registerOutTps(RuntimeContext context) {
-        Counter parserCounter =
-                context.getMetricGroup()
-                        .addGroup(METRIC_GROUP_SINK)
-                        .counter(METRICS_SINK_OUT_TPS + "_counter", new SimpleCounter());
-        return context.getMetricGroup()
-                .addGroup(METRIC_GROUP_SINK)
-                .meter(METRICS_SINK_OUT_TPS, new MeterView(parserCounter, 60));
-    }
+	private static final String METRIC_GROUP_SINK = "sink";
 
-    public static Meter registerOutBps(RuntimeContext context) {
-        Counter bpsCounter =
-                context.getMetricGroup()
-                        .addGroup(METRIC_GROUP_SINK)
-                        .counter(METRICS_SINK_OUT_BPS + "_counter", new SimpleCounter());
-        return context.getMetricGroup()
-                .addGroup(METRIC_GROUP_SINK)
-                .meter(METRICS_SINK_OUT_BPS, new MeterView(bpsCounter, 60));
-    }
+	private static final String METRICS_SINK_IN_TPS = "inTps";
 
-    public static LatencyGauge registerOutLatency(RuntimeContext context) {
-        return context.getMetricGroup()
-                .addGroup(METRIC_GROUP_SINK)
-                .gauge(METRICS_SINK_OUT_LATENCY, new LatencyGauge());
-    }
+	private static final String METRICS_SINK_OUT_TPS = "outTps";
 
-    public static class LatencyGauge implements Gauge<Double> {
-        private double value;
+	private static final String METRICS_SINK_OUT_BPS = "outBps";
 
-        public void report(long timeDelta, long batchSize) {
-            if (batchSize != 0) {
-                this.value = (1.0 * timeDelta) / batchSize;
-            }
-        }
+	private static final String METRICS_SINK_OUT_LATENCY = "outLatency";
 
-        @Override
-        public Double getValue() {
-            return value;
-        }
-    }
+	public static Meter registerSinkInTps(RuntimeContext context) {
+		Counter parserCounter = context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.counter(METRICS_SINK_IN_TPS + "_counter", new SimpleCounter());
+		return context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.meter(METRICS_SINK_IN_TPS, new MeterView(parserCounter, 60));
+	}
 
-    public static class TimestampGauge implements Gauge<Long>, Serializable {
-        private Long value;
+	public static Meter registerOutTps(RuntimeContext context) {
+		Counter parserCounter = context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.counter(METRICS_SINK_OUT_TPS + "_counter", new SimpleCounter());
+		return context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.meter(METRICS_SINK_OUT_TPS, new MeterView(parserCounter, 60));
+	}
 
-        public void report(long delay) {
-            this.value = delay;
-        }
+	public static Meter registerOutBps(RuntimeContext context) {
+		Counter bpsCounter = context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.counter(METRICS_SINK_OUT_BPS + "_counter", new SimpleCounter());
+		return context.getMetricGroup()
+			.addGroup(METRIC_GROUP_SINK)
+			.meter(METRICS_SINK_OUT_BPS, new MeterView(bpsCounter, 60));
+	}
 
-        @Override
-        public Long getValue() {
-            return value;
-        }
-    }
+	public static LatencyGauge registerOutLatency(RuntimeContext context) {
+		return context.getMetricGroup().addGroup(METRIC_GROUP_SINK).gauge(METRICS_SINK_OUT_LATENCY, new LatencyGauge());
+	}
+
+	public static class LatencyGauge implements Gauge<Double> {
+
+		private double value;
+
+		public void report(long timeDelta, long batchSize) {
+			if (batchSize != 0) {
+				this.value = (1.0 * timeDelta) / batchSize;
+			}
+		}
+
+		@Override
+		public Double getValue() {
+			return value;
+		}
+
+	}
+
+	public static class TimestampGauge implements Gauge<Long>, Serializable {
+
+		private Long value;
+
+		public void report(long delay) {
+			this.value = delay;
+		}
+
+		@Override
+		public Long getValue() {
+			return value;
+		}
+
+	}
+
 }

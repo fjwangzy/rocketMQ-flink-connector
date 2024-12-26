@@ -17,10 +17,12 @@
  */
 package org.apache.rocketmq.flink.catalog;
 
-import org.apache.rocketmq.common.admin.TopicOffset;
-import org.apache.rocketmq.common.admin.TopicStatsTable;
+//import org.apache.rocketmq.common.admin.TopicOffset;
+//import org.apache.rocketmq.common.admin.TopicStatsTable;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.flink.common.constant.SchemaRegistryConstant;
+import org.apache.rocketmq.remoting.protocol.admin.TopicOffset;
+import org.apache.rocketmq.remoting.protocol.admin.TopicStatsTable;
 import org.apache.rocketmq.schema.registry.client.SchemaRegistryClient;
 import org.apache.rocketmq.schema.registry.common.dto.GetSchemaResponse;
 import org.apache.rocketmq.schema.registry.common.model.SchemaType;
@@ -51,7 +53,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -66,333 +68,315 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(MockitoJUnitRunner.class)
 public class RocketMQCatalogTest {
-    @Mock private SchemaRegistryClient schemaRegistryClient;
-    @Mock private DefaultMQAdminExt mqAdminExt;
-    @Mock private GetSchemaResponse getSchemaResponse;
-    private RocketMQCatalog rocketMQCatalog;
 
-    @Before
-    public void setUp() throws Exception {
-        rocketMQCatalog =
-                new RocketMQCatalog(
-                        "rocketmq_catalog",
-                        "default",
-                        "http://localhost:9876",
-                        SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL);
+	@Mock
+	private SchemaRegistryClient schemaRegistryClient;
 
-        Field schemaRegistryClientField =
-                rocketMQCatalog.getClass().getDeclaredField("schemaRegistryClient");
-        schemaRegistryClientField.setAccessible(true);
-        schemaRegistryClientField.set(rocketMQCatalog, schemaRegistryClient);
+	@Mock
+	private DefaultMQAdminExt mqAdminExt;
 
-        Field mqAdminExtField = rocketMQCatalog.getClass().getDeclaredField("mqAdminExt");
-        mqAdminExtField.setAccessible(true);
-        mqAdminExtField.set(rocketMQCatalog, mqAdminExt);
+	@Mock
+	private GetSchemaResponse getSchemaResponse;
 
-        List<String> list = new ArrayList();
-        list.add("test");
-        Mockito.when(schemaRegistryClient.getSubjectsByTenant("default", "default"))
-                .thenReturn(list);
+	private RocketMQCatalog rocketMQCatalog;
 
-        Mockito.when(mqAdminExt.getNamesrvAddr()).thenReturn("localhost:9876");
-        Mockito.when(schemaRegistryClient.getSchemaBySubject("test")).thenReturn(getSchemaResponse);
-        Mockito.when(getSchemaResponse.getType()).thenReturn(SchemaType.AVRO);
-        Mockito.when(getSchemaResponse.getIdl())
-                .thenReturn(
-                        "{\"type\":\"record\",\"name\":\"Charge\","
-                                + "\"namespace\":\"org.apache.rocketmq.schema.registry.example.serde\",\"fields\":[{\"name\":\"item\","
-                                + "\"type\":\"string\"},{\"name\":\"amount\",\"type\":\"double\"}]}");
+	@Before
+	public void setUp() throws Exception {
+		rocketMQCatalog = new RocketMQCatalog("rocketmq_catalog", "default", "http://localhost:9876",
+				SchemaRegistryConstant.SCHEMA_REGISTRY_BASE_URL);
 
-        TopicStatsTable topicStatsTable = new TopicStatsTable();
-        topicStatsTable.setOffsetTable(
-                new HashMap<MessageQueue, TopicOffset>(2) {
-                    {
-                        put(new MessageQueue("test", "default", 0), new TopicOffset());
-                        put(new MessageQueue("test", "default", 1), new TopicOffset());
-                    }
-                });
+		Field schemaRegistryClientField = rocketMQCatalog.getClass().getDeclaredField("schemaRegistryClient");
+		schemaRegistryClientField.setAccessible(true);
+		schemaRegistryClientField.set(rocketMQCatalog, schemaRegistryClient);
 
-        Mockito.when(mqAdminExt.examineTopicStats("test")).thenReturn(topicStatsTable);
-    }
+		Field mqAdminExtField = rocketMQCatalog.getClass().getDeclaredField("mqAdminExt");
+		mqAdminExtField.setAccessible(true);
+		mqAdminExtField.set(rocketMQCatalog, mqAdminExt);
 
-    @Test
-    public void testGetFactory() {
-        Optional<Factory> factory = rocketMQCatalog.getFactory();
-        assertNotNull(factory.get());
-    }
+		List<String> list = new ArrayList();
+		list.add("test");
+		Mockito.when(schemaRegistryClient.getSubjectsByTenant("default", "default")).thenReturn(list);
 
-    @Test
-    public void testOpen() throws NoSuchFieldException, IllegalAccessException {
-        rocketMQCatalog.open();
+		Mockito.when(mqAdminExt.getNamesrvAddr()).thenReturn("localhost:9876");
+		Mockito.when(schemaRegistryClient.getSchemaBySubject("test")).thenReturn(getSchemaResponse);
+		Mockito.when(getSchemaResponse.getType()).thenReturn(SchemaType.AVRO);
+		Mockito.when(getSchemaResponse.getIdl())
+			.thenReturn("{\"type\":\"record\",\"name\":\"Charge\","
+					+ "\"namespace\":\"org.apache.rocketmq.schema.registry.example.serde\",\"fields\":[{\"name\":\"item\","
+					+ "\"type\":\"string\"},{\"name\":\"amount\",\"type\":\"double\"}]}");
 
-        Class<? extends RocketMQCatalog> aClass = rocketMQCatalog.getClass();
-        Field mqAdminExtField = aClass.getDeclaredField("mqAdminExt");
-        mqAdminExtField.setAccessible(true);
-        Field schemaRegistryClientField = aClass.getDeclaredField("schemaRegistryClient");
-        schemaRegistryClientField.setAccessible(true);
+		TopicStatsTable topicStatsTable = new TopicStatsTable();
+		topicStatsTable.setOffsetTable(new HashMap<MessageQueue, TopicOffset>(2) {
+			{
+				put(new MessageQueue("test", "default", 0), new TopicOffset());
+				put(new MessageQueue("test", "default", 1), new TopicOffset());
+			}
+		});
 
-        Object mqAdminExt = mqAdminExtField.get(rocketMQCatalog);
-        Object schemaRegistryClient = schemaRegistryClientField.get(rocketMQCatalog);
-        assertNotNull(mqAdminExt);
-        assertNotNull(schemaRegistryClient);
-    }
+		Mockito.when(mqAdminExt.examineTopicStats("test")).thenReturn(topicStatsTable);
+	}
 
-    @Test
-    public void testClose() throws NoSuchFieldException, IllegalAccessException {
-        rocketMQCatalog.close();
+	@Test
+	public void testGetFactory() {
+		Optional<Factory> factory = rocketMQCatalog.getFactory();
+		assertNotNull(factory.get());
+	}
 
-        Class<? extends RocketMQCatalog> aClass = rocketMQCatalog.getClass();
-        Field mqAdminExtField = aClass.getDeclaredField("mqAdminExt");
-        mqAdminExtField.setAccessible(true);
-        Field schemaRegistryClientField = aClass.getDeclaredField("schemaRegistryClient");
-        schemaRegistryClientField.setAccessible(true);
+	@Test
+	public void testOpen() throws NoSuchFieldException, IllegalAccessException {
+		rocketMQCatalog.open();
 
-        Object mqAdminExt = mqAdminExtField.get(rocketMQCatalog);
-        Object schemaRegistryClient = schemaRegistryClientField.get(rocketMQCatalog);
-        assertNull(schemaRegistryClient);
-    }
+		Class<? extends RocketMQCatalog> aClass = rocketMQCatalog.getClass();
+		Field mqAdminExtField = aClass.getDeclaredField("mqAdminExt");
+		mqAdminExtField.setAccessible(true);
+		Field schemaRegistryClientField = aClass.getDeclaredField("schemaRegistryClient");
+		schemaRegistryClientField.setAccessible(true);
 
-    @Test
-    public void testListDatabases() {
-        List<String> strings = rocketMQCatalog.listDatabases();
-        assertEquals(1, strings.size());
-        assertEquals("default", strings.get(0));
-    }
+		Object mqAdminExt = mqAdminExtField.get(rocketMQCatalog);
+		Object schemaRegistryClient = schemaRegistryClientField.get(rocketMQCatalog);
+		assertNotNull(mqAdminExt);
+		assertNotNull(schemaRegistryClient);
+	}
 
-    @Test
-    public void testGetDatabase() throws DatabaseNotExistException {
-        CatalogDatabase database = rocketMQCatalog.getDatabase("default");
-        assertNotNull(database);
-    }
+	@Test
+	public void testClose() throws NoSuchFieldException, IllegalAccessException {
+		rocketMQCatalog.close();
 
-    @Test
-    public void testDatabaseExists() {
-        boolean exists = rocketMQCatalog.databaseExists("default");
-        assertTrue(exists);
-    }
+		Class<? extends RocketMQCatalog> aClass = rocketMQCatalog.getClass();
+		Field mqAdminExtField = aClass.getDeclaredField("mqAdminExt");
+		mqAdminExtField.setAccessible(true);
+		Field schemaRegistryClientField = aClass.getDeclaredField("schemaRegistryClient");
+		schemaRegistryClientField.setAccessible(true);
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testCreateDatabase() throws DatabaseAlreadyExistException {
-        rocketMQCatalog.createDatabase("test", null, false);
-    }
+		Object mqAdminExt = mqAdminExtField.get(rocketMQCatalog);
+		Object schemaRegistryClient = schemaRegistryClientField.get(rocketMQCatalog);
+		assertNull(schemaRegistryClient);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testDropDatabase() throws DatabaseNotEmptyException, DatabaseNotExistException {
-        rocketMQCatalog.dropDatabase("test", false, false);
-    }
+	@Test
+	public void testListDatabases() {
+		List<String> strings = rocketMQCatalog.listDatabases();
+		assertEquals(1, strings.size());
+		assertEquals("default", strings.get(0));
+	}
 
-    @Test
-    public void testListTables() throws DatabaseNotExistException {
-        List<String> strings = rocketMQCatalog.listTables("default");
-        assertEquals(1, strings.size());
-        assertEquals("test", strings.get(0));
-    }
+	@Test
+	public void testGetDatabase() throws DatabaseNotExistException {
+		CatalogDatabase database = rocketMQCatalog.getDatabase("default");
+		assertNotNull(database);
+	}
 
-    @Test
-    public void testGetTable() throws TableNotExistException {
-        ObjectPath objectPath = new ObjectPath("default", "test");
-        CatalogBaseTable catalogBaseTable = rocketMQCatalog.getTable(objectPath);
-        assertNotNull(catalogBaseTable);
-    }
+	@Test
+	public void testDatabaseExists() {
+		boolean exists = rocketMQCatalog.databaseExists("default");
+		assertTrue(exists);
+	}
 
-    @Test
-    public void testTableExists() {
-        ObjectPath objectPath = new ObjectPath("default", "test");
-        boolean exists = rocketMQCatalog.tableExists(objectPath);
-        assertTrue(exists);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testCreateDatabase() throws DatabaseAlreadyExistException {
+		rocketMQCatalog.createDatabase("test", null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testCreateTable() throws TableAlreadyExistException, DatabaseNotExistException {
-        rocketMQCatalog.createTable(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testDropDatabase() throws DatabaseNotEmptyException, DatabaseNotExistException {
+		rocketMQCatalog.dropDatabase("test", false, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testDropTable() throws TableNotExistException {
-        rocketMQCatalog.dropTable(null, false);
-    }
+	@Test
+	public void testListTables() throws DatabaseNotExistException {
+		List<String> strings = rocketMQCatalog.listTables("default");
+		assertEquals(1, strings.size());
+		assertEquals("test", strings.get(0));
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testListFunctions() throws DatabaseNotExistException {
-        rocketMQCatalog.listFunctions("default");
-    }
+	@Test
+	public void testGetTable() throws TableNotExistException {
+		ObjectPath objectPath = new ObjectPath("default", "test");
+		CatalogBaseTable catalogBaseTable = rocketMQCatalog.getTable(objectPath);
+		assertNotNull(catalogBaseTable);
+	}
 
-    @Test(expected = FunctionNotExistException.class)
-    public void testGetFunction() throws FunctionNotExistException {
-        ObjectPath objectPath = new ObjectPath("default", "test");
-        rocketMQCatalog.getFunction(objectPath);
-    }
+	@Test
+	public void testTableExists() {
+		ObjectPath objectPath = new ObjectPath("default", "test");
+		boolean exists = rocketMQCatalog.tableExists(objectPath);
+		assertTrue(exists);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testFunctionExists() {
-        boolean exists = rocketMQCatalog.functionExists(null);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testCreateTable() throws TableAlreadyExistException, DatabaseNotExistException {
+		rocketMQCatalog.createTable(null, null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testCreateFunction()
-            throws FunctionAlreadyExistException, DatabaseNotExistException {
-        rocketMQCatalog.createFunction(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testDropTable() throws TableNotExistException {
+		rocketMQCatalog.dropTable(null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterFunction() throws FunctionNotExistException {
-        rocketMQCatalog.alterFunction(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testListFunctions() throws DatabaseNotExistException {
+		rocketMQCatalog.listFunctions("default");
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testDropFunction() throws FunctionNotExistException {
-        rocketMQCatalog.dropFunction(null, false);
-    }
+	@Test(expected = FunctionNotExistException.class)
+	public void testGetFunction() throws FunctionNotExistException {
+		ObjectPath objectPath = new ObjectPath("default", "test");
+		rocketMQCatalog.getFunction(objectPath);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterDatabase() throws DatabaseNotExistException {
-        rocketMQCatalog.alterDatabase(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testFunctionExists() {
+		boolean exists = rocketMQCatalog.functionExists(null);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testListViews() throws DatabaseNotExistException {
-        rocketMQCatalog.listViews("default");
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testCreateFunction() throws FunctionAlreadyExistException, DatabaseNotExistException {
+		rocketMQCatalog.createFunction(null, null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterTable() throws TableNotExistException {
-        rocketMQCatalog.alterTable(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterFunction() throws FunctionNotExistException {
+		rocketMQCatalog.alterFunction(null, null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testRenameTable() throws TableAlreadyExistException, TableNotExistException {
-        rocketMQCatalog.renameTable(null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testDropFunction() throws FunctionNotExistException {
+		rocketMQCatalog.dropFunction(null, false);
+	}
 
-    @Test
-    public void testListPartitions() throws TableNotPartitionedException, TableNotExistException {
-        List<CatalogPartitionSpec> catalogPartitionSpecs =
-                rocketMQCatalog.listPartitions(new ObjectPath("default", "test"));
-        assertEquals(2, catalogPartitionSpecs.size());
-        assertEquals(
-                new ArrayList<CatalogPartitionSpec>() {
-                    {
-                        add(
-                                new CatalogPartitionSpec(
-                                        new HashMap<String, String>(1) {
-                                            {
-                                                put("__queue_id__", String.valueOf(0));
-                                            }
-                                        }));
-                        add(
-                                new CatalogPartitionSpec(
-                                        new HashMap<String, String>(1) {
-                                            {
-                                                put("__queue_id__", String.valueOf(1));
-                                            }
-                                        }));
-                    }
-                },
-                catalogPartitionSpecs);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterDatabase() throws DatabaseNotExistException {
+		rocketMQCatalog.alterDatabase(null, null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testListPartitionsByFilter()
-            throws TableNotPartitionedException, TableNotExistException {
-        rocketMQCatalog.listPartitionsByFilter(null, null);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testListViews() throws DatabaseNotExistException {
+		rocketMQCatalog.listViews("default");
+	}
 
-    @Test
-    public void testGetPartition() throws PartitionNotExistException {
-        ObjectPath objectPath = new ObjectPath("default", "test");
-        CatalogPartition partition =
-                rocketMQCatalog.getPartition(
-                        objectPath,
-                        new CatalogPartitionSpec(
-                                new HashMap<String, String>(1) {
-                                    {
-                                        put("__queue_id__", String.valueOf(0));
-                                    }
-                                }));
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterTable() throws TableNotExistException {
+		rocketMQCatalog.alterTable(null, null, false);
+	}
 
-        assertEquals(
-                new HashMap<String, String>(1) {
-                    {
-                        put("__queue_id__", String.valueOf(0));
-                    }
-                },
-                partition.getProperties());
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testRenameTable() throws TableAlreadyExistException, TableNotExistException {
+		rocketMQCatalog.renameTable(null, null, false);
+	}
 
-    @Test
-    public void testPartitionExists() {
-        ObjectPath objectPath = new ObjectPath("default", "test");
-        boolean test =
-                rocketMQCatalog.partitionExists(
-                        objectPath,
-                        new CatalogPartitionSpec(
-                                new HashMap<String, String>(1) {
-                                    {
-                                        put("__queue_id__", String.valueOf(0));
-                                    }
-                                }));
-        assertNotNull(test);
-    }
+	@Test
+	public void testListPartitions() throws TableNotPartitionedException, TableNotExistException {
+		List<CatalogPartitionSpec> catalogPartitionSpecs = rocketMQCatalog
+			.listPartitions(new ObjectPath("default", "test"));
+		assertEquals(2, catalogPartitionSpecs.size());
+		assertEquals(new ArrayList<CatalogPartitionSpec>() {
+			{
+				add(new CatalogPartitionSpec(new HashMap<String, String>(1) {
+					{
+						put("__queue_id__", String.valueOf(0));
+					}
+				}));
+				add(new CatalogPartitionSpec(new HashMap<String, String>(1) {
+					{
+						put("__queue_id__", String.valueOf(1));
+					}
+				}));
+			}
+		}, catalogPartitionSpecs);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testCreatePartition()
-            throws TableNotPartitionedException, TableNotExistException,
-                    PartitionSpecInvalidException, PartitionAlreadyExistsException {
-        rocketMQCatalog.createPartition(null, null, null, false);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testListPartitionsByFilter() throws TableNotPartitionedException, TableNotExistException {
+		rocketMQCatalog.listPartitionsByFilter(null, null);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testDropPartition() throws PartitionNotExistException {
-        rocketMQCatalog.dropPartition(null, null, false);
-    }
+	@Test
+	public void testGetPartition() throws PartitionNotExistException {
+		ObjectPath objectPath = new ObjectPath("default", "test");
+		CatalogPartition partition = rocketMQCatalog.getPartition(objectPath,
+				new CatalogPartitionSpec(new HashMap<String, String>(1) {
+					{
+						put("__queue_id__", String.valueOf(0));
+					}
+				}));
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterPartition() throws PartitionNotExistException {
-        rocketMQCatalog.alterPartition(null, null, null, false);
-    }
+		assertEquals(new HashMap<String, String>(1) {
+			{
+				put("__queue_id__", String.valueOf(0));
+			}
+		}, partition.getProperties());
+	}
 
-    @Test
-    public void testGetTableStatistics() throws TableNotExistException {
-        CatalogTableStatistics statistics = rocketMQCatalog.getTableStatistics(null);
-        assertEquals(statistics, CatalogTableStatistics.UNKNOWN);
-    }
+	@Test
+	public void testPartitionExists() {
+		ObjectPath objectPath = new ObjectPath("default", "test");
+		boolean test = rocketMQCatalog.partitionExists(objectPath,
+				new CatalogPartitionSpec(new HashMap<String, String>(1) {
+					{
+						put("__queue_id__", String.valueOf(0));
+					}
+				}));
+		assertNotNull(test);
+	}
 
-    @Test
-    public void testGetTableColumnStatistics() throws TableNotExistException {
-        CatalogColumnStatistics statistics = rocketMQCatalog.getTableColumnStatistics(null);
-        assertEquals(statistics, CatalogColumnStatistics.UNKNOWN);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testCreatePartition() throws TableNotPartitionedException, TableNotExistException,
+			PartitionSpecInvalidException, PartitionAlreadyExistsException {
+		rocketMQCatalog.createPartition(null, null, null, false);
+	}
 
-    @Test
-    public void testGetPartitionStatistics() throws PartitionNotExistException {
-        CatalogTableStatistics statistics = rocketMQCatalog.getPartitionStatistics(null, null);
-        assertEquals(statistics, CatalogTableStatistics.UNKNOWN);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testDropPartition() throws PartitionNotExistException {
+		rocketMQCatalog.dropPartition(null, null, false);
+	}
 
-    @Test
-    public void testGetPartitionColumnStatistics() throws PartitionNotExistException {
-        CatalogColumnStatistics statistics =
-                rocketMQCatalog.getPartitionColumnStatistics(null, null);
-        assertEquals(statistics, CatalogColumnStatistics.UNKNOWN);
-    }
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterPartition() throws PartitionNotExistException {
+		rocketMQCatalog.alterPartition(null, null, null, false);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterTableStatistics() throws TableNotExistException {
-        rocketMQCatalog.alterTableStatistics(null, null, false);
-    }
+	@Test
+	public void testGetTableStatistics() throws TableNotExistException {
+		CatalogTableStatistics statistics = rocketMQCatalog.getTableStatistics(null);
+		assertEquals(statistics, CatalogTableStatistics.UNKNOWN);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterTableColumnStatistics() throws TableNotExistException {
-        rocketMQCatalog.alterTableColumnStatistics(null, null, false);
-    }
+	@Test
+	public void testGetTableColumnStatistics() throws TableNotExistException {
+		CatalogColumnStatistics statistics = rocketMQCatalog.getTableColumnStatistics(null);
+		assertEquals(statistics, CatalogColumnStatistics.UNKNOWN);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterPartitionStatistics() throws PartitionNotExistException {
-        rocketMQCatalog.alterPartitionStatistics(null, null, null, false);
-    }
+	@Test
+	public void testGetPartitionStatistics() throws PartitionNotExistException {
+		CatalogTableStatistics statistics = rocketMQCatalog.getPartitionStatistics(null, null);
+		assertEquals(statistics, CatalogTableStatistics.UNKNOWN);
+	}
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void testAlterPartitionColumnStatistics() throws PartitionNotExistException {
-        rocketMQCatalog.alterPartitionColumnStatistics(null, null, null, false);
-    }
+	@Test
+	public void testGetPartitionColumnStatistics() throws PartitionNotExistException {
+		CatalogColumnStatistics statistics = rocketMQCatalog.getPartitionColumnStatistics(null, null);
+		assertEquals(statistics, CatalogColumnStatistics.UNKNOWN);
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterTableStatistics() throws TableNotExistException {
+		rocketMQCatalog.alterTableStatistics(null, null, false);
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterTableColumnStatistics() throws TableNotExistException {
+		rocketMQCatalog.alterTableColumnStatistics(null, null, false);
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterPartitionStatistics() throws PartitionNotExistException {
+		rocketMQCatalog.alterPartitionStatistics(null, null, null, false);
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testAlterPartitionColumnStatistics() throws PartitionNotExistException {
+		rocketMQCatalog.alterPartitionColumnStatistics(null, null, null, false);
+	}
+
 }

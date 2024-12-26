@@ -41,49 +41,49 @@ import static org.junit.Assert.assertEquals;
 /** Tests for {@link RocketMQSourceFunction}. */
 public class RocketMQSourceFunctionTest {
 
-    @Test
-    public void testSetStartupMode() throws NoSuchFieldException, IllegalAccessException {
-        RocketMQSourceFunction<String> source =
-                new RocketMQSourceFunction<>(
-                        new SimpleStringDeserializationSchema(), new Properties());
-        assertEquals(StartupMode.GROUP_OFFSETS, getFieldValue(source, "startMode"));
-        source.setStartFromEarliest();
-        assertEquals(StartupMode.EARLIEST, getFieldValue(source, "startMode"));
-        source.setStartFromLatest();
-        assertEquals(StartupMode.LATEST, getFieldValue(source, "startMode"));
-        source.setStartFromTimeStamp(0L);
-        assertEquals(StartupMode.TIMESTAMP, getFieldValue(source, "startMode"));
-        source.setStartFromSpecificOffsets(null);
-        assertEquals(StartupMode.SPECIFIC_OFFSETS, getFieldValue(source, "startMode"));
-        source.setStartFromGroupOffsets();
-        assertEquals(StartupMode.GROUP_OFFSETS, getFieldValue(source, "startMode"));
-        assertEquals(OffsetResetStrategy.LATEST, getFieldValue(source, "offsetResetStrategy"));
-        source.setStartFromGroupOffsets(OffsetResetStrategy.EARLIEST);
-        assertEquals(OffsetResetStrategy.EARLIEST, getFieldValue(source, "offsetResetStrategy"));
-    }
+	@Test
+	public void testSetStartupMode() throws NoSuchFieldException, IllegalAccessException {
+		RocketMQSourceFunction<String> source = new RocketMQSourceFunction<>(new SimpleStringDeserializationSchema(),
+				new Properties());
+		assertEquals(StartupMode.GROUP_OFFSETS, getFieldValue(source, "startMode"));
+		source.setStartFromEarliest();
+		assertEquals(StartupMode.EARLIEST, getFieldValue(source, "startMode"));
+		source.setStartFromLatest();
+		assertEquals(StartupMode.LATEST, getFieldValue(source, "startMode"));
+		source.setStartFromTimeStamp(0L);
+		assertEquals(StartupMode.TIMESTAMP, getFieldValue(source, "startMode"));
+		source.setStartFromSpecificOffsets(null);
+		assertEquals(StartupMode.SPECIFIC_OFFSETS, getFieldValue(source, "startMode"));
+		source.setStartFromGroupOffsets();
+		assertEquals(StartupMode.GROUP_OFFSETS, getFieldValue(source, "startMode"));
+		assertEquals(OffsetResetStrategy.LATEST, getFieldValue(source, "offsetResetStrategy"));
+		source.setStartFromGroupOffsets(OffsetResetStrategy.EARLIEST);
+		assertEquals(OffsetResetStrategy.EARLIEST, getFieldValue(source, "offsetResetStrategy"));
+	}
 
-    @Test
-    public void testRestartFromCheckpoint() throws Exception {
-        Properties properties = new Properties();
-        properties.setProperty(RocketMQConfig.CONSUMER_GROUP, "${ConsumerGroup}");
-        properties.setProperty(RocketMQConfig.CONSUMER_TOPIC, "${SourceTopic}");
-        properties.setProperty(RocketMQConfig.CONSUMER_TAG, DEFAULT_CONSUMER_TAG);
-        RocketMQSourceFunction<String> source =
-                new RocketMQSourceFunction<>(new SimpleStringDeserializationSchema(), properties);
-        source.setStartFromLatest();
-        setFieldValue(source, "restored", true);
-        HashMap<MessageQueue, Long> map = new HashMap<>();
-        map.put(new MessageQueue("tpc", "broker-0", 0), 20L);
-        map.put(new MessageQueue("tpc", "broker-0", 1), 21L);
-        map.put(new MessageQueue("tpc", "broker-1", 0), 30L);
-        map.put(new MessageQueue("tpc", "broker-1", 1), 31L);
-        setFieldValue(source, "restoredOffsets", map);
-        setFieldValue(source, "offsetTable", new ConcurrentHashMap<>());
-        source.initOffsetTableFromRestoredOffsets(new ArrayList<>(map.keySet()));
-        Map<MessageQueue, Long> offsetTable = (Map) getFieldValue(source, "offsetTable");
-        for (Map.Entry<MessageQueue, Long> entry : map.entrySet()) {
-            assertEquals(offsetTable.containsKey(entry.getKey()), true);
-            assertEquals(offsetTable.containsValue(entry.getValue()), true);
-        }
-    }
+	@Test
+	public void testRestartFromCheckpoint() throws Exception {
+		Properties properties = new Properties();
+		properties.setProperty(RocketMQConfig.CONSUMER_GROUP, "${ConsumerGroup}");
+		properties.setProperty(RocketMQConfig.CONSUMER_TOPIC, "${SourceTopic}");
+		properties.setProperty(RocketMQConfig.CONSUMER_TAG, DEFAULT_CONSUMER_TAG);
+		RocketMQSourceFunction<String> source = new RocketMQSourceFunction<>(new SimpleStringDeserializationSchema(),
+				properties);
+		source.setStartFromLatest();
+		setFieldValue(source, "restored", true);
+		HashMap<MessageQueue, Long> map = new HashMap<>();
+		map.put(new MessageQueue("tpc", "broker-0", 0), 20L);
+		map.put(new MessageQueue("tpc", "broker-0", 1), 21L);
+		map.put(new MessageQueue("tpc", "broker-1", 0), 30L);
+		map.put(new MessageQueue("tpc", "broker-1", 1), 31L);
+		setFieldValue(source, "restoredOffsets", map);
+		setFieldValue(source, "offsetTable", new ConcurrentHashMap<>());
+		source.initOffsetTableFromRestoredOffsets(new ArrayList<>(map.keySet()));
+		Map<MessageQueue, Long> offsetTable = (Map) getFieldValue(source, "offsetTable");
+		for (Map.Entry<MessageQueue, Long> entry : map.entrySet()) {
+			assertEquals(offsetTable.containsKey(entry.getKey()), true);
+			assertEquals(offsetTable.containsValue(entry.getValue()), true);
+		}
+	}
+
 }

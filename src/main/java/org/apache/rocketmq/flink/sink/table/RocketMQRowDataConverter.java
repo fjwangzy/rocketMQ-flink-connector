@@ -41,177 +41,180 @@ import static org.apache.rocketmq.flink.sink.table.RocketMQDynamicTableSink.Writ
 import static org.apache.rocketmq.flink.sink.table.RocketMQDynamicTableSink.WritableMetadata.KEYS;
 import static org.apache.rocketmq.flink.sink.table.RocketMQDynamicTableSink.WritableMetadata.TAGS;
 
-/** RocketMQRowDataConverter converts the row data of table to RocketMQ message pattern. */
+/**
+ * RocketMQRowDataConverter converts the row data of table to RocketMQ message pattern.
+ */
 public class RocketMQRowDataConverter implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = LoggerFactory.getLogger(RocketMQRowDataConverter.class);
+	private static final Logger LOG = LoggerFactory.getLogger(RocketMQRowDataConverter.class);
 
-    private final String topic;
-    private final String tag;
-    private final String dynamicColumn;
-    private final String fieldDelimiter;
-    private final String encoding;
+	private final String topic;
 
-    private final boolean isDynamicTag;
-    private final boolean isDynamicTagIncluded;
-    private final boolean writeKeysToBody;
-    private boolean onlyVarbinary = false;
+	private final String tag;
 
-    private final String[] keyColumns;
-    private final RowTypeInfo rowTypeInfo;
-    private final DataType[] fieldDataTypes;
+	private final String dynamicColumn;
 
-    private int[] keyFieldIndexes;
-    private int[] tagFieldIndexes;
-    private int[] bodyFieldIndexes;
-    private DataType[] bodyFieldTypes;
+	private final String fieldDelimiter;
 
-    private final boolean hasMetadata;
-    private final int[] metadataPositions;
+	private final String encoding;
 
-    public RocketMQRowDataConverter(
-            String topic,
-            String tag,
-            String dynamicColumn,
-            String fieldDelimiter,
-            String encoding,
-            boolean isDynamicTag,
-            boolean isDynamicTagIncluded,
-            boolean writeKeysToBody,
-            String[] keyColumns,
-            RowTypeInfo rowTypeInfo,
-            DataType[] fieldDataTypes,
-            boolean hasMetadata,
-            int[] metadataPositions) {
-        this.topic = topic;
-        this.tag = tag;
-        this.dynamicColumn = dynamicColumn;
-        this.fieldDelimiter = fieldDelimiter;
-        this.encoding = encoding;
-        this.isDynamicTag = isDynamicTag;
-        this.isDynamicTagIncluded = isDynamicTagIncluded;
-        this.writeKeysToBody = writeKeysToBody;
-        this.keyColumns = keyColumns;
-        this.rowTypeInfo = rowTypeInfo;
-        this.fieldDataTypes = fieldDataTypes;
-        this.hasMetadata = hasMetadata;
-        this.metadataPositions = metadataPositions;
-    }
+	private final boolean isDynamicTag;
 
-    public void open() {
-        if (rowTypeInfo.getArity() == 1
-                && rowTypeInfo.getFieldTypes()[0].getTypeClass().equals(byte[].class)) {
-            onlyVarbinary = true;
-        }
-        Set<Integer> excludedFields = new HashSet<>();
-        if (keyColumns != null) {
-            keyFieldIndexes = new int[keyColumns.length];
-            for (int index = 0; index < keyColumns.length; index++) {
-                int fieldIndex = rowTypeInfo.getFieldIndex(keyColumns[index]);
-                checkState(
-                        fieldIndex >= 0,
-                        String.format(
-                                "[MetaQConverter] Could not find the message-key column: %s.",
-                                keyColumns[index]));
-                keyFieldIndexes[index] = fieldIndex;
-                if (!writeKeysToBody) {
-                    excludedFields.add(fieldIndex);
-                }
-            }
-        } else {
-            keyFieldIndexes = new int[0];
-        }
-        if (isDynamicTag && dynamicColumn != null) {
-            tagFieldIndexes = new int[1];
-            int fieldIndex = rowTypeInfo.getFieldIndex(dynamicColumn);
-            checkState(
-                    fieldIndex >= 0,
-                    String.format(
-                            "[MetaQConverter] Could not find the tag column: %s.", dynamicColumn));
-            tagFieldIndexes[0] = fieldIndex;
-            if (!isDynamicTagIncluded) {
-                excludedFields.add(fieldIndex);
-            }
-        } else {
-            tagFieldIndexes = new int[0];
-        }
-        bodyFieldIndexes = new int[rowTypeInfo.getArity() - excludedFields.size()];
-        bodyFieldTypes = new DataType[rowTypeInfo.getArity() - excludedFields.size()];
-        int index = 0;
-        for (int num = 0; num < rowTypeInfo.getArity(); num++) {
-            if (!excludedFields.contains(num)) {
-                bodyFieldIndexes[index] = num;
-                bodyFieldTypes[index++] = fieldDataTypes[num];
-            }
-        }
-    }
+	private final boolean isDynamicTagIncluded;
 
-    public Message convert(RowData row) {
-        if (row.getRowKind() != RowKind.INSERT && row.getRowKind() != RowKind.UPDATE_AFTER) {
-            return null;
-        }
-        Message message = new Message();
-        message.setTopic(topic);
-        List<String> keys = new ArrayList<>();
-        for (int fieldIndex : keyFieldIndexes) {
-            keys.add(row.getString(fieldIndex).toString());
-        }
-        if (keys.size() > 0) {
-            message.setKeys(keys);
-        }
-        if (!isDynamicTag) {
-            if (tag != null && tag.length() > 0) {
-                message.setTags(tag);
-            }
-        } else {
-            checkState(tagFieldIndexes.length > 0, "No message tag column set.");
-            message.setTags(row.getString(tagFieldIndexes[0]).toString());
-        }
-        if (onlyVarbinary) {
-            message.setBody(row.getBinary(0));
-            message.setWaitStoreMsgOK(true);
-        } else {
-            Object[] values = new Object[bodyFieldIndexes.length];
-            for (int index = 0; index < bodyFieldIndexes.length; index++) {
-                values[index] =
-                        RowData.createFieldGetter(
-                                        bodyFieldTypes[index].getLogicalType(),
-                                        bodyFieldIndexes[index])
-                                .getFieldOrNull(row);
-            }
-            try {
-                message.setBody(StringUtils.join(values, fieldDelimiter).getBytes(encoding));
-                message.setWaitStoreMsgOK(true);
-            } catch (UnsupportedEncodingException e) {
-                LOG.error(
-                        String.format(
-                                "Unsupported ''{%s}'' encoding charset. Check the encoding configItem in the DDL.",
-                                encoding),
-                        e);
-            }
-        }
-        if (hasMetadata) {
-            String messageKeys = readMetadata(row, KEYS);
-            message.setKeys(messageKeys);
-            message.setTags(readMetadata(row, TAGS));
-        }
-        return message;
-    }
+	private final boolean writeKeysToBody;
 
-    @SuppressWarnings("unchecked")
-    private <T> T readMetadata(RowData consumedRow, WritableMetadata metadata) {
-        final int pos = metadataPositions[metadata.ordinal()];
-        if (pos < 0) {
-            return null;
-        }
-        return (T) metadata.converter.read(consumedRow, pos);
-    }
+	private boolean onlyVarbinary = false;
 
-    // --------------------------------------------------------------------------------------------
+	private final String[] keyColumns;
 
-    interface MetadataConverter extends Serializable {
-        Object read(RowData consumedRow, int pos);
-    }
+	private final RowTypeInfo rowTypeInfo;
+
+	private final DataType[] fieldDataTypes;
+
+	private int[] keyFieldIndexes;
+
+	private int[] tagFieldIndexes;
+
+	private int[] bodyFieldIndexes;
+
+	private DataType[] bodyFieldTypes;
+
+	private final boolean hasMetadata;
+
+	private final int[] metadataPositions;
+
+	public RocketMQRowDataConverter(String topic, String tag, String dynamicColumn, String fieldDelimiter,
+			String encoding, boolean isDynamicTag, boolean isDynamicTagIncluded, boolean writeKeysToBody,
+			String[] keyColumns, RowTypeInfo rowTypeInfo, DataType[] fieldDataTypes, boolean hasMetadata,
+			int[] metadataPositions) {
+		this.topic = topic;
+		this.tag = tag;
+		this.dynamicColumn = dynamicColumn;
+		this.fieldDelimiter = fieldDelimiter;
+		this.encoding = encoding;
+		this.isDynamicTag = isDynamicTag;
+		this.isDynamicTagIncluded = isDynamicTagIncluded;
+		this.writeKeysToBody = writeKeysToBody;
+		this.keyColumns = keyColumns;
+		this.rowTypeInfo = rowTypeInfo;
+		this.fieldDataTypes = fieldDataTypes;
+		this.hasMetadata = hasMetadata;
+		this.metadataPositions = metadataPositions;
+	}
+
+	public void open() {
+		if (rowTypeInfo.getArity() == 1 && rowTypeInfo.getFieldTypes()[0].getTypeClass().equals(byte[].class)) {
+			onlyVarbinary = true;
+		}
+		Set<Integer> excludedFields = new HashSet<>();
+		if (keyColumns != null) {
+			keyFieldIndexes = new int[keyColumns.length];
+			for (int index = 0; index < keyColumns.length; index++) {
+				int fieldIndex = rowTypeInfo.getFieldIndex(keyColumns[index]);
+				checkState(fieldIndex >= 0, String.format("[MetaQConverter] Could not find the message-key column: %s.",
+						keyColumns[index]));
+				keyFieldIndexes[index] = fieldIndex;
+				if (!writeKeysToBody) {
+					excludedFields.add(fieldIndex);
+				}
+			}
+		}
+		else {
+			keyFieldIndexes = new int[0];
+		}
+		if (isDynamicTag && dynamicColumn != null) {
+			tagFieldIndexes = new int[1];
+			int fieldIndex = rowTypeInfo.getFieldIndex(dynamicColumn);
+			checkState(fieldIndex >= 0,
+					String.format("[MetaQConverter] Could not find the tag column: %s.", dynamicColumn));
+			tagFieldIndexes[0] = fieldIndex;
+			if (!isDynamicTagIncluded) {
+				excludedFields.add(fieldIndex);
+			}
+		}
+		else {
+			tagFieldIndexes = new int[0];
+		}
+		bodyFieldIndexes = new int[rowTypeInfo.getArity() - excludedFields.size()];
+		bodyFieldTypes = new DataType[rowTypeInfo.getArity() - excludedFields.size()];
+		int index = 0;
+		for (int num = 0; num < rowTypeInfo.getArity(); num++) {
+			if (!excludedFields.contains(num)) {
+				bodyFieldIndexes[index] = num;
+				bodyFieldTypes[index++] = fieldDataTypes[num];
+			}
+		}
+	}
+
+	public Message convert(RowData row) {
+		if (row.getRowKind() != RowKind.INSERT && row.getRowKind() != RowKind.UPDATE_AFTER) {
+			return null;
+		}
+		Message message = new Message();
+		message.setTopic(topic);
+		List<String> keys = new ArrayList<>();
+		for (int fieldIndex : keyFieldIndexes) {
+			keys.add(row.getString(fieldIndex).toString());
+		}
+		if (keys.size() > 0) {
+			message.setKeys(keys);
+		}
+		if (!isDynamicTag) {
+			if (tag != null && tag.length() > 0) {
+				message.setTags(tag);
+			}
+		}
+		else {
+			checkState(tagFieldIndexes.length > 0, "No message tag column set.");
+			message.setTags(row.getString(tagFieldIndexes[0]).toString());
+		}
+		if (onlyVarbinary) {
+			message.setBody(row.getBinary(0));
+			message.setWaitStoreMsgOK(true);
+		}
+		else {
+			Object[] values = new Object[bodyFieldIndexes.length];
+			for (int index = 0; index < bodyFieldIndexes.length; index++) {
+				values[index] = RowData
+					.createFieldGetter(bodyFieldTypes[index].getLogicalType(), bodyFieldIndexes[index])
+					.getFieldOrNull(row);
+			}
+			try {
+				message.setBody(StringUtils.join(values, fieldDelimiter).getBytes(encoding));
+				message.setWaitStoreMsgOK(true);
+			}
+			catch (UnsupportedEncodingException e) {
+				LOG.error(String.format(
+						"Unsupported ''{%s}'' encoding charset. Check the encoding configItem in the DDL.", encoding),
+						e);
+			}
+		}
+		if (hasMetadata) {
+			String messageKeys = readMetadata(row, KEYS);
+			message.setKeys(messageKeys);
+			message.setTags(readMetadata(row, TAGS));
+		}
+		return message;
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T> T readMetadata(RowData consumedRow, WritableMetadata metadata) {
+		final int pos = metadataPositions[metadata.ordinal()];
+		if (pos < 0) {
+			return null;
+		}
+		return (T) metadata.converter.read(consumedRow, pos);
+	}
+
+	// --------------------------------------------------------------------------------------------
+
+	interface MetadataConverter extends Serializable {
+
+		Object read(RowData consumedRow, int pos);
+
+	}
+
 }
